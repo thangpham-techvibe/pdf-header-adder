@@ -807,3 +807,14 @@ input:checked + .slider-round:before {
     height: 1.2rem;
     flex-shrink: 0;
 }
+
+/* Shrink content preview transition */
+.a4-mock-content {
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.a4-sheet.shrink-active .a4-mock-content {
+    transform: scale(var(--preview-shrink-scale, 0.85));
+    transform-origin: bottom center;
+}
+
