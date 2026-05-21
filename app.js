@@ -9,7 +9,8 @@ const state = {
     scale: 50,
     topMargin: 20,
     skipFirst: false,
-    skipLast: false
+    skipLast: false,
+    shrinkContent: true
 };
 
 // DOM Elements
@@ -27,6 +28,7 @@ const scaleVal = document.getElementById('scale-val');
 const marginSlider = document.getElementById('header-margin');
 const marginVal = document.getElementById('margin-val');
 
+const shrinkContentCheckbox = document.getElementById('shrink-content');
 const skipFirstCheckbox = document.getElementById('skip-first');
 const skipLastCheckbox = document.getElementById('skip-last');
 
@@ -47,6 +49,7 @@ const progressBar = document.getElementById('progress-bar');
 const toast = document.getElementById('toast');
 const toastIcon = document.getElementById('toast-icon');
 const toastMessage = document.getElementById('toast-message');
+
 
 // Initialize Lucide Icons
 lucide.createIcons();
@@ -181,6 +184,11 @@ marginSlider.addEventListener('input', (e) => {
 });
 
 // Update Toggles
+shrinkContentCheckbox.addEventListener('change', (e) => {
+    state.shrinkContent = e.target.checked;
+    updatePreview();
+});
+
 skipFirstCheckbox.addEventListener('change', (e) => {
     state.skipFirst = e.target.checked;
 });
@@ -206,13 +214,27 @@ function updatePreview() {
     a4Sheet.style.setProperty('--preview-margin', `${previewMargin}px`);
     
     // Dynamic height based on image aspect ratio
+    let previewHeight = 24;
     if (state.aspectRatio) {
         // A4 sheet width in CSS is 250px
         const previewWidth = 250 * (state.scale / 100);
-        const previewHeight = previewWidth * state.aspectRatio;
+        previewHeight = previewWidth * state.aspectRatio;
         a4Sheet.style.setProperty('--preview-height', `${previewHeight}px`);
     } else {
         a4Sheet.style.setProperty('--preview-height', '24px');
+    }
+
+    // Shrink content mockup preview
+    if (state.shrinkContent) {
+        a4Sheet.classList.add('shrink-active');
+        // Total height taken by header in preview
+        const totalHeaderHeight = previewMargin + previewHeight + 10;
+        const contentHeight = 300; // estimated mock content container height
+        const scaleFactor = Math.max(0.65, Math.min(1.0, (contentHeight - totalHeaderHeight) / contentHeight));
+        a4Sheet.style.setProperty('--preview-shrink-scale', scaleFactor);
+    } else {
+        a4Sheet.classList.remove('shrink-active');
+        a4Sheet.style.setProperty('--preview-shrink-scale', '1.0');
     }
 }
 
@@ -254,59 +276,129 @@ processBtn.addEventListener('click', async () => {
         const pdfDoc = await PDFDocument.load(pdfBytes);
         updateProgress(55, 'Đang nhúng hình ảnh PNG...');
 
-        // Embed PNG
-        let pngImage;
-        try {
-            pngImage = await pdfDoc.embedPng(pngBytes);
-        } catch (embedError) {
-            throw new Error('Ảnh PNG không hợp lệ hoặc bị hỏng. Hãy chọn file ảnh PNG chuẩn.');
-        }
-
-        const { width: imgOriginalWidth, height: imgOriginalHeight } = pngImage.scale(1.0);
         const pages = pdfDoc.getPages();
         const totalPages = pages.length;
 
+        let destPdfDoc;
+        let pngImage;
+        let embeddedPages = [];
+
+        if (state.shrinkContent) {
+            destPdfDoc = await PDFDocument.create();
+            try {
+                pngImage = await destPdfDoc.embedPng(pngBytes);
+            } catch (embedError) {
+                throw new Error('Ảnh PNG không hợp lệ hoặc bị hỏng. Hãy chọn file ảnh PNG chuẩn.');
+            }
+            updateProgress(60, 'Đang chuẩn bị nhúng các trang tài liệu gốc...');
+            const pageIndices = Array.from({ length: totalPages }, (_, idx) => idx);
+            embeddedPages = await destPdfDoc.embedPdf(pdfDoc, pageIndices);
+        } else {
+            destPdfDoc = pdfDoc;
+            try {
+                pngImage = await destPdfDoc.embedPng(pngBytes);
+            } catch (embedError) {
+                throw new Error('Ảnh PNG không hợp lệ hoặc bị hỏng. Hãy chọn file ảnh PNG chuẩn.');
+            }
+        }
+
+        const { width: imgOriginalWidth, height: imgOriginalHeight } = pngImage.scale(1.0);
         updateProgress(65, 'Đang chèn Header vào các trang...');
 
         // Process each page
         for (let i = 0; i < totalPages; i++) {
-            // Check skip conditions
-            if (state.skipFirst && i === 0) continue;
-            if (state.skipLast && i === totalPages - 1) continue;
-
-            const page = pages[i];
-            
-            // Get CropBox for correct coordinate calculations (ignores MediaBox offsets)
-            const cropBox = page.getCropBox();
+            const originalPage = pages[i];
+            const cropBox = originalPage.getCropBox();
             const cropX = cropBox.x;
             const cropY = cropBox.y;
             const cropWidth = cropBox.width;
             const cropHeight = cropBox.height;
 
-            // Calculate image size relative to visible page width (CropBox width)
-            const targetWidth = cropWidth * (state.scale / 100);
-            const targetHeight = (imgOriginalHeight / imgOriginalWidth) * targetWidth;
+            const isSkipped = (state.skipFirst && i === 0) || (state.skipLast && i === totalPages - 1);
 
-            // Calculate horizontal X coordinate based on alignment relative to CropBox
-            let x = cropX; 
-            if (state.alignment === 'center') {
-                x = cropX + (cropWidth - targetWidth) / 2;
-            } else if (state.alignment === 'right') {
-                x = cropX + cropWidth - targetWidth;
+            if (state.shrinkContent) {
+                // Add a blank page to destination matching original dimensions
+                const newPage = destPdfDoc.addPage([originalPage.getWidth(), originalPage.getHeight()]);
+                newPage.setCropBox(cropX, cropY, cropWidth, cropHeight);
+
+                if (isSkipped) {
+                    // Draw original page at full size
+                    newPage.drawPage(embeddedPages[i], {
+                        x: 0,
+                        y: 0,
+                        width: originalPage.getWidth(),
+                        height: originalPage.getHeight()
+                    });
+                } else {
+                    // Calculate dimensions for header
+                    const targetWidth = cropWidth * (state.scale / 100);
+                    const targetHeight = (imgOriginalHeight / imgOriginalWidth) * targetWidth;
+
+                    // Space reserved for header: topMargin + headerHeight + 15pt spacing
+                    const headerHeightTotal = state.topMargin + targetHeight + 15;
+
+                    // Calculate scale factor for main content
+                    const scaleFactor = Math.max(0.1, (cropHeight - headerHeightTotal) / cropHeight);
+
+                    // Compute scaled page dimensions
+                    const drawWidth = originalPage.getWidth() * scaleFactor;
+                    const drawHeight = originalPage.getHeight() * scaleFactor;
+
+                    // Center horizontal offset in CropBox
+                    const newCropBoxX = cropX + (cropWidth - cropWidth * scaleFactor) / 2;
+                    const newCropBoxY = cropY;
+
+                    // MediaBox offsets mapping
+                    const drawX = newCropBoxX - (cropX * scaleFactor);
+                    const drawY = newCropBoxY - (cropY * scaleFactor);
+
+                    // Draw scaled down page content
+                    newPage.drawPage(embeddedPages[i], {
+                        x: drawX,
+                        y: drawY,
+                        width: drawWidth,
+                        height: drawHeight
+                    });
+
+                    // Draw the PNG header on top
+                    let headerX = cropX;
+                    if (state.alignment === 'center') {
+                        headerX = cropX + (cropWidth - targetWidth) / 2;
+                    } else if (state.alignment === 'right') {
+                        headerX = cropX + cropWidth - targetWidth;
+                    }
+
+                    const headerY = cropY + cropHeight - state.topMargin - targetHeight;
+
+                    newPage.drawImage(pngImage, {
+                        x: headerX,
+                        y: headerY,
+                        width: targetWidth,
+                        height: targetHeight
+                    });
+                }
+            } else {
+                if (isSkipped) continue;
+
+                const targetWidth = cropWidth * (state.scale / 100);
+                const targetHeight = (imgOriginalHeight / imgOriginalWidth) * targetWidth;
+
+                let x = cropX;
+                if (state.alignment === 'center') {
+                    x = cropX + (cropWidth - targetWidth) / 2;
+                } else if (state.alignment === 'right') {
+                    x = cropX + cropWidth - targetWidth;
+                }
+
+                const y = cropY + cropHeight - state.topMargin - targetHeight;
+
+                originalPage.drawImage(pngImage, {
+                    x: x,
+                    y: y,
+                    width: targetWidth,
+                    height: targetHeight
+                });
             }
-
-            // Calculate vertical Y coordinate relative to CropBox
-            // Top of the visible page is cropY + cropHeight
-            // So drawing anchor (bottom-left of image) is at: cropY + cropHeight - topMargin - targetHeight
-            const y = cropY + cropHeight - state.topMargin - targetHeight;
-
-            // Draw image
-            page.drawImage(pngImage, {
-                x: x,
-                y: y,
-                width: targetWidth,
-                height: targetHeight
-            });
 
             // Update progressive processing progress
             const pageProgress = 65 + Math.floor((i + 1) / totalPages * 25);
@@ -316,7 +408,7 @@ processBtn.addEventListener('click', async () => {
         updateProgress(90, 'Đang chuẩn bị file tải xuống...');
 
         // Save modified PDF
-        const pdfBytesModified = await pdfDoc.save();
+        const pdfBytesModified = await destPdfDoc.save();
         updateProgress(98, 'Đang tải xuống...');
 
 
