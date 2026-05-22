@@ -483,6 +483,20 @@ cvGenerateBtn.addEventListener('click', async () => {
             .forEach(([x1, y1, x2, y2]) =>
                 sumPage.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: 0.5, color: C.border }));
 
+        // Footer
+        const ftrH = 32;
+        sumPage.drawRectangle({ x: 0, y: 0, width: A4W, height: ftrH, color: C.accent });
+        const ftrText = 'www.teamtechvibe.com';
+        const ftrSz = 11;
+        const ftrW = regFont.widthOfTextAtSize(ftrText, ftrSz);
+        sumPage.drawText(ftrText, {
+            x: (A4W - ftrW) / 2,
+            y: (ftrH - ftrSz) / 2 + 2,
+            font: regFont,
+            size: ftrSz,
+            color: C.white,
+        });
+
         updateProgress(60, 'Embedding CV pages...');
 
         // ── PAGES 3+: ORIGINAL CV WITH HEADER ─────────
