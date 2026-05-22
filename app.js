@@ -419,10 +419,9 @@ cvGenerateBtn.addEventListener('click', async () => {
         // ── SUMMARY TABLE PAGE ──────────────────────────
         const sumPage = outDoc.addPage([A4W, A4H]);
         sumPage.drawRectangle({ x: 0, y: 0, width: A4W, height: A4H, color: C.white });
-        sumPage.drawImage(pngImage, { x: 0, y: A4H - hdrH, width: A4W, height: hdrH });
-
+        
         // Title
-        const stTitleY = A4H - hdrH - 42;
+        const stTitleY = A4H - 80;
         const stTitle  = 'CANDIDATE SUMMARY', stSz = 15;
         const stW = boldFont.widthOfTextAtSize(stTitle, stSz);
         sumPage.drawText(stTitle, { x: (A4W - stW) / 2, y: stTitleY, font: boldFont, size: stSz, color: C.accentDk });
@@ -483,20 +482,8 @@ cvGenerateBtn.addEventListener('click', async () => {
             .forEach(([x1, y1, x2, y2]) =>
                 sumPage.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: 0.5, color: C.border }));
 
-        // Footer
-        const ftrH = 32;
-        const footerColor = rgb(42/255, 138/255, 170/255); // #2a8aaa
-        sumPage.drawRectangle({ x: 0, y: 0, width: A4W, height: ftrH, color: footerColor });
-        const ftrText = 'www.teamtechvibe.com';
-        const ftrSz = 11;
-        const ftrW = regFont.widthOfTextAtSize(ftrText, ftrSz);
-        sumPage.drawText(ftrText, {
-            x: A4W - ftrW - 30, // Align right with 30px padding
-            y: (ftrH - ftrSz) / 2 + 2,
-            font: regFont,
-            size: ftrSz,
-            color: C.white,
-        });
+        // Footer (Uploaded image as footer)
+        sumPage.drawImage(pngImage, { x: 0, y: 0, width: A4W, height: hdrH });
 
         updateProgress(60, 'Embedding CV pages...');
 
