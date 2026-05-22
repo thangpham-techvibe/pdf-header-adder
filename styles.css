@@ -421,31 +421,38 @@ input:checked + .slider-round:before { transform: translateX(20px); }
 
 /* Summary Preview Table */
 .summary-preview-panel { display: flex; flex-direction: column; gap: 1rem; }
-.preview-table-wrapper { overflow: hidden; border-radius: 12px; border: 1px solid rgba(255,255,255,0.07); }
-.summary-preview-table { width: 100%; border-collapse: collapse; }
+.preview-table-wrapper { overflow: hidden; border-radius: 12px; border: 1px solid #000000; background: #ffffff; }
+.summary-preview-table { width: 100%; border-collapse: collapse; background: #ffffff; }
 .preview-label {
     width: 32%;
     padding: 0.8rem 1rem;
     font-size: 0.82rem;
     font-weight: 700;
-    color: #fff;
-    background: #42B0D5;
-    border-bottom: 1px solid rgba(255,255,255,0.15);
-    vertical-align: top;
+    color: #1b75bb;
+    background: #ffffff;
+    border-bottom: 1px solid #000000;
+    border-right: 1px solid #000000;
+    vertical-align: middle;
     letter-spacing: 0.01em;
     text-align: left;
 }
 .preview-value {
     padding: 0.8rem 1rem;
     font-size: 0.85rem;
-    color: var(--text-primary);
-    background: rgba(15, 23, 42, 0.5);
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    vertical-align: top;
+    color: #000000;
+    background: #ffffff;
+    border-bottom: 1px solid #000000;
+    vertical-align: middle;
     white-space: pre-wrap;
     word-break: break-word;
     line-height: 1.55;
 }
-.summary-preview-table tr:nth-child(even) .preview-value { background: rgba(15, 23, 42, 0.35); }
 .summary-preview-table tr:last-child .preview-label,
 .summary-preview-table tr:last-child .preview-value { border-bottom: none; }
+
+/* Custom coloring for Name and Position in live preview to match the PDF */
+.summary-preview-table tr:nth-child(1) .preview-value,
+.summary-preview-table tr:nth-child(2) .preview-value {
+    color: #1b75bb;
+    font-weight: 700;
+}

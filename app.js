@@ -421,17 +421,15 @@ cvGenerateBtn.addEventListener('click', async () => {
         sumPage.drawRectangle({ x: 0, y: 0, width: A4W, height: A4H, color: C.white });
         sumPage.drawImage(pngImage, { x: 0, y: A4H - hdrH, width: A4W, height: hdrH });
 
-        // Title
-        const stTitleY = A4H - hdrH - 42;
-        const stTitle  = 'CANDIDATE SUMMARY', stSz = 15;
-        const stW = boldFont.widthOfTextAtSize(stTitle, stSz);
-        sumPage.drawText(stTitle, { x: (A4W - stW) / 2, y: stTitleY, font: boldFont, size: stSz, color: C.accentDk });
-        sumPage.drawLine({ start: { x: 40, y: stTitleY - 10 }, end: { x: A4W - 40, y: stTitleY - 10 }, thickness: 1.5, color: C.accent });
-
-        // Table settings
+        // Table settings (directly below header)
         const tblX = 40, tblW = A4W - 80, col1W = 148, col2W = tblW - col1W;
         const cellPad = 9, lineH = 13, minRowH = 34;
-        let curY = stTitleY - 28;
+        const tblStartY = A4H - hdrH - 50;
+        let curY = tblStartY;
+
+        // Custom branding colors matching the design
+        const blueText = rgb(0.106, 0.459, 0.733); // #1b75bb
+        const blackColor = rgb(0, 0, 0);
 
         const rows = [
             ['Name',            form.name],
@@ -443,45 +441,75 @@ cvGenerateBtn.addEventListener('click', async () => {
         ];
 
         rows.forEach(([label, value], idx) => {
-            const lines  = wrapText(value, col2W - cellPad * 2, regFont, 10);
+            const valFont = idx < 2 ? boldFont : regFont;
+            const lines  = wrapText(value, col2W - cellPad * 2, valFont, 10);
             const rowH   = Math.max(minRowH, lines.length * lineH + cellPad * 2);
             const rowY   = curY - rowH;
-            const bgFill = idx % 2 === 0 ? C.row1 : C.row2;
 
-            // Label cell
-            sumPage.drawRectangle({ x: tblX, y: rowY, width: col1W, height: rowH, color: C.accent });
-            // Value cell
-            sumPage.drawRectangle({ x: tblX + col1W, y: rowY, width: col2W, height: rowH, color: bgFill });
-            // Row separator
-            sumPage.drawLine({ start: { x: tblX, y: rowY }, end: { x: tblX + tblW, y: rowY }, thickness: 0.4, color: C.border });
+            // Draw white background for cells
+            sumPage.drawRectangle({ x: tblX, y: rowY, width: col1W, height: rowH, color: C.white });
+            sumPage.drawRectangle({ x: tblX + col1W, y: rowY, width: col2W, height: rowH, color: C.white });
 
-            // Label text — left-aligned with padding
+            // Row separator (bottom line of current row)
+            sumPage.drawLine({ start: { x: tblX, y: rowY }, end: { x: tblX + tblW, y: rowY }, thickness: 0.8, color: blackColor });
+
+            // Label text — bold & blue
             const lblSz = 10;
             sumPage.drawText(label, {
                 x: tblX + cellPad,
                 y: rowY + rowH / 2 - lblSz / 2,
-                font: boldFont, size: lblSz, color: C.white,
+                font: boldFont, size: lblSz, color: blueText,
             });
 
-            // Value text
+            // Value text (first two rows in blue & bold, others in black & regular)
+            const valColor = idx < 2 ? blueText : blackColor;
             lines.forEach((ln, li) => {
                 if (ln.trim()) {
                     sumPage.drawText(ln, {
                         x: tblX + col1W + cellPad,
                         y: rowY + rowH - cellPad - 10 - li * lineH,
-                        font: regFont, size: 10, color: C.darkText,
+                        font: valFont, size: 10, color: valColor,
                     });
                 }
             });
             curY -= rowH;
         });
 
-        // Table borders (outer + column divider)
-        const tblStartY = stTitleY - 28;
-        [[tblX, tblStartY, tblX, curY], [tblX + tblW, tblStartY, tblX + tblW, curY],
-         [tblX, curY, tblX + tblW, curY], [tblX + col1W, tblStartY, tblX + col1W, curY]]
-            .forEach(([x1, y1, x2, y2]) =>
-                sumPage.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: 0.5, color: C.border }));
+        // Table borders (Top line + outer borders + column divider)
+        sumPage.drawLine({ start: { x: tblX, y: tblStartY }, end: { x: tblX + tblW, y: tblStartY }, thickness: 0.8, color: blackColor }); // Top line
+        sumPage.drawLine({ start: { x: tblX, y: tblStartY }, end: { x: tblX, y: curY }, thickness: 0.8, color: blackColor }); // Left outer border
+        sumPage.drawLine({ start: { x: tblX + tblW, y: tblStartY }, end: { x: tblX + tblW, y: curY }, thickness: 0.8, color: blackColor }); // Right outer border
+        sumPage.drawLine({ start: { x: tblX + col1W, y: tblStartY }, end: { x: tblX + col1W, y: curY }, thickness: 0.8, color: blackColor }); // Column divider
+
+        // ── DRAW FOOTER GRADIENT (Page 1 Only) ──────────
+        const N = 100;
+        const stripW = A4W / N;
+        for (let j = 0; j < N; j++) {
+            const t = j / N;
+            // Interpolate from light blue (#42B0D5) to dark blue (#1c4587)
+            const r = 0.259 * (1 - t) + 0.110 * t;
+            const g = 0.690 * (1 - t) + 0.271 * t;
+            const b = 0.835 * (1 - t) + 0.529 * t;
+            sumPage.drawRectangle({
+                x: j * stripW,
+                y: 0,
+                width: stripW + 0.5,
+                height: 25,
+                color: rgb(r, g, b)
+            });
+        }
+
+        // Center footer text
+        const footerText = '© www.teamtechvibe.com';
+        const ftSz = 9;
+        const ftW = regFont.widthOfTextAtSize(footerText, ftSz);
+        sumPage.drawText(footerText, {
+            x: (A4W - ftW) / 2,
+            y: 12.5 - ftSz / 2,
+            font: regFont,
+            size: ftSz,
+            color: C.white
+        });
 
         updateProgress(60, 'Embedding CV pages...');
 
