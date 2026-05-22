@@ -70,19 +70,62 @@ body {
 
 /* Header */
 .app-header {
-    text-align: center;
-    margin-bottom: 2rem;
-}
-.logo {
-    display: inline-flex;
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--card-border);
+    gap: 1.5rem;
 }
-.logo-icon { width: 2.5rem; height: 2.5rem; color: #00f2fe; filter: drop-shadow(0 0 10px rgba(0,242,254,0.4)); }
-.logo h1 { font-size: 2.25rem; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.logo h1 span { background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.subtitle { color: var(--text-secondary); font-size: 1rem; max-width: 620px; margin: 0 auto; font-weight: 400; line-height: 1.5; }
+.logo-container {
+    display: flex;
+    align-items: center;
+}
+.brand-logo {
+    height: 50px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.15));
+    transition: transform 0.3s ease;
+}
+.brand-logo:hover {
+    transform: scale(1.05);
+}
+.header-title {
+    text-align: right;
+}
+.header-title h1 {
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.header-title h1 span {
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.subtitle {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    margin-top: 0.25rem;
+    font-weight: 400;
+    line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+    .app-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 1rem;
+    }
+    .header-title {
+        text-align: center;
+    }
+}
 
 /* ============================= */
 /* TAB NAVIGATION                */
