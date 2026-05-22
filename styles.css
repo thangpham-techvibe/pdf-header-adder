@@ -449,3 +449,14 @@ input:checked + .slider-round:before { transform: translateX(20px); }
 .summary-preview-table tr:nth-child(even) .preview-value { background: rgba(15, 23, 42, 0.35); }
 .summary-preview-table tr:last-child .preview-label,
 .summary-preview-table tr:last-child .preview-value { border-bottom: none; }
+
+.summary-preview-footer {
+    background: #2a8aaa;
+    color: #fff;
+    text-align: right;
+    padding: 0.6rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}

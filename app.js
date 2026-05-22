@@ -485,12 +485,13 @@ cvGenerateBtn.addEventListener('click', async () => {
 
         // Footer
         const ftrH = 32;
-        sumPage.drawRectangle({ x: 0, y: 0, width: A4W, height: ftrH, color: C.accent });
+        const footerColor = rgb(42/255, 138/255, 170/255); // #2a8aaa
+        sumPage.drawRectangle({ x: 0, y: 0, width: A4W, height: ftrH, color: footerColor });
         const ftrText = 'www.teamtechvibe.com';
         const ftrSz = 11;
         const ftrW = regFont.widthOfTextAtSize(ftrText, ftrSz);
         sumPage.drawText(ftrText, {
-            x: (A4W - ftrW) / 2,
+            x: A4W - ftrW - 30, // Align right with 30px padding
             y: (ftrH - ftrSz) / 2 + 2,
             font: regFont,
             size: ftrSz,
