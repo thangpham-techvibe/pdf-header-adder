@@ -1,153 +1,143 @@
-// Application State
+// =====================================================
+// SHARED STATE
+// =====================================================
 const state = {
-    pdfFile: null,
-    pdfFileName: '',
-    pngFile: null,
-    pngFileName: '',
-    pngBase64: null,
-    alignment: 'left',
-    scale: 50,
-    topMargin: 20,
-    skipFirst: false,
-    skipLast: false,
-    shrinkContent: true
+    pdfFile: null, pdfFileName: '',
+    pngFile: null, pngFileName: '', pngBase64: null,
+    alignment: 'left', scale: 50, topMargin: 20,
+    skipFirst: false, skipLast: false, shrinkContent: true, aspectRatio: null
 };
 
-// DOM Elements
-const pdfInput = document.getElementById('pdf-input');
-const pdfDropZone = document.getElementById('pdf-drop-zone');
-const pdfNameDisplay = document.getElementById('pdf-name');
+const cvState = {
+    pdfFile: null, pdfFileName: '',
+    pngFile: null, pngFileName: ''
+};
 
-const pngInput = document.getElementById('png-input');
-const pngDropZone = document.getElementById('png-drop-zone');
-const pngNameDisplay = document.getElementById('png-name');
-
-const scaleSlider = document.getElementById('header-scale');
-const scaleVal = document.getElementById('scale-val');
-
-const marginSlider = document.getElementById('header-margin');
-const marginVal = document.getElementById('margin-val');
-
-const shrinkContentCheckbox = document.getElementById('shrink-content');
-const skipFirstCheckbox = document.getElementById('skip-first');
-const skipLastCheckbox = document.getElementById('skip-last');
-
-const alignButtons = document.querySelectorAll('.align-btn');
-const processBtn = document.getElementById('process-btn');
-const statusMessage = document.getElementById('status-message');
-
-const a4Sheet = document.getElementById('a4-sheet');
-const previewHeader = document.getElementById('preview-header');
-const previewHeaderImg = document.getElementById('preview-header-img');
-const previewHeaderText = document.getElementById('preview-header-text');
-
+// =====================================================
+// DOM ELEMENTS – SHARED
+// =====================================================
 const loadingOverlay = document.getElementById('loading-overlay');
-const loaderTitle = document.getElementById('loader-title');
+const loaderTitle    = document.getElementById('loader-title');
 const loaderSubtitle = document.getElementById('loader-subtitle');
-const progressBar = document.getElementById('progress-bar');
+const progressBar    = document.getElementById('progress-bar');
+const toast          = document.getElementById('toast');
+const toastIcon      = document.getElementById('toast-icon');
+const toastMessage   = document.getElementById('toast-message');
 
-const toast = document.getElementById('toast');
-const toastIcon = document.getElementById('toast-icon');
-const toastMessage = document.getElementById('toast-message');
+// DOM – Tab 1
+const pdfInput             = document.getElementById('pdf-input');
+const pdfDropZone          = document.getElementById('pdf-drop-zone');
+const pdfNameDisplay       = document.getElementById('pdf-name');
+const pngInput             = document.getElementById('png-input');
+const pngDropZone          = document.getElementById('png-drop-zone');
+const pngNameDisplay       = document.getElementById('png-name');
+const scaleSlider          = document.getElementById('header-scale');
+const scaleVal             = document.getElementById('scale-val');
+const marginSlider         = document.getElementById('header-margin');
+const marginVal            = document.getElementById('margin-val');
+const shrinkContentCheckbox= document.getElementById('shrink-content');
+const skipFirstCheckbox    = document.getElementById('skip-first');
+const skipLastCheckbox     = document.getElementById('skip-last');
+const alignButtons         = document.querySelectorAll('.align-btn');
+const processBtn           = document.getElementById('process-btn');
+const statusMessage        = document.getElementById('status-message');
+const a4Sheet              = document.getElementById('a4-sheet');
+const previewHeaderImg     = document.getElementById('preview-header-img');
+const previewHeaderText    = document.getElementById('preview-header-text');
 
+// DOM – Tab 2
+const cvPdfInput          = document.getElementById('cv-pdf-input');
+const cvPdfDropZone       = document.getElementById('cv-pdf-drop-zone');
+const cvPdfNameDisplay    = document.getElementById('cv-pdf-name');
+const cvPngInput          = document.getElementById('cv-png-input');
+const cvPngDropZone       = document.getElementById('cv-png-drop-zone');
+const cvPngNameDisplay    = document.getElementById('cv-png-name');
+const cvGenerateBtn       = document.getElementById('cv-generate-btn');
+const cvStatusMessage     = document.getElementById('cv-status-message');
 
-// Initialize Lucide Icons
+// Initialize icons
 lucide.createIcons();
 
-// --- Toast Notification Handler ---
+// =====================================================
+// SHARED UTILITIES
+// =====================================================
 function showToast(message, type = 'info') {
     toastMessage.textContent = message;
     toast.className = `toast show ${type}`;
-    
-    // Change icon based on type
-    if (type === 'success') {
-        toastIcon.setAttribute('data-lucide', 'check-circle');
-    } else if (type === 'error') {
-        toastIcon.setAttribute('data-lucide', 'alert-triangle');
-    } else {
-        toastIcon.setAttribute('data-lucide', 'info');
-    }
+    toastIcon.setAttribute('data-lucide',
+        type === 'success' ? 'check-circle' : type === 'error' ? 'alert-triangle' : 'info');
     lucide.createIcons();
-
-    setTimeout(() => {
-        toast.classList.remove('show');
-    }, 4000);
+    setTimeout(() => toast.classList.remove('show'), 4000);
 }
 
-// --- Drag and Drop Setup ---
+function readFileAsArrayBuffer(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error(`Cannot read: ${file.name}`));
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+function updateProgress(pct, subtitle) {
+    progressBar.style.width = `${pct}%`;
+    if (subtitle) loaderSubtitle.textContent = subtitle;
+}
+
 function setupDragAndDrop(zone, input, fileType, callback) {
-    // Click on zone triggers input click, but ignore bubbled click from the input itself
-    zone.addEventListener('click', (e) => {
-        if (e.target !== input) {
-            input.click();
-        }
-    });
-
-    // Drag-drop visual effects
-    zone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        zone.classList.add('dragover');
-    });
-
-    zone.addEventListener('dragleave', () => {
-        zone.classList.remove('dragover');
-    });
-
+    zone.addEventListener('click', (e) => { if (e.target !== input) input.click(); });
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
     zone.addEventListener('drop', (e) => {
         e.preventDefault();
         zone.classList.remove('dragover');
-        
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
             const file = e.dataTransfer.files[0];
-            const isCorrectType = fileType === 'pdf' ? file.name.endsWith('.pdf') : file.name.endsWith('.png');
-            
-            if (isCorrectType) {
-                input.files = e.dataTransfer.files;
-                callback(file);
-            } else {
-                showToast(`Vui lòng chọn đúng định dạng file .${fileType}`, 'error');
-            }
+            const ok = fileType === 'pdf' ? file.name.toLowerCase().endsWith('.pdf') : file.name.toLowerCase().endsWith('.png');
+            if (ok) { input.files = e.dataTransfer.files; callback(file); }
+            else showToast(`Please select a .${fileType} file`, 'error');
         }
     });
-
-    input.addEventListener('change', (e) => {
-        if (e.target.files && e.target.files.length > 0) {
-            callback(e.target.files[0]);
-        }
-    });
+    input.addEventListener('change', (e) => { if (e.target.files && e.target.files.length > 0) callback(e.target.files[0]); });
 }
 
-// PDF File Selected Callback
+// =====================================================
+// TAB NAVIGATION
+// =====================================================
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+    });
+});
+
+// =====================================================
+// TAB 1 – HEADER ADDER
+// =====================================================
 function handlePdfSelected(file) {
-    state.pdfFile = file;
-    state.pdfFileName = file.name;
+    state.pdfFile = file; state.pdfFileName = file.name;
     pdfNameDisplay.textContent = file.name;
     pdfDropZone.classList.add('has-file');
-    showToast('Đã nhận file PDF thành công!', 'success');
+    showToast('PDF loaded!', 'success');
     checkReadyState();
 }
 
-// PNG File Selected Callback
 function handlePngSelected(file) {
-    state.pngFile = file;
-    state.pngFileName = file.name;
+    state.pngFile = file; state.pngFileName = file.name;
     pngNameDisplay.textContent = file.name;
     pngDropZone.classList.add('has-file');
-
-    // Read to Base64 for Preview
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = (e) => {
         state.pngBase64 = e.target.result;
         previewHeaderImg.src = state.pngBase64;
         previewHeaderImg.style.display = 'block';
         previewHeaderText.style.display = 'none';
-        
-        // Load image to calculate aspect ratio
-        previewHeaderImg.onload = function() {
+        previewHeaderImg.onload = () => {
             state.aspectRatio = previewHeaderImg.naturalHeight / previewHeaderImg.naturalWidth;
-            showToast('Đã nhận file ảnh Header PNG thành công!', 'success');
-            updatePreview();
-            checkReadyState();
+            showToast('Header PNG loaded!', 'success');
+            updatePreview(); checkReadyState();
         };
     };
     reader.readAsDataURL(file);
@@ -156,301 +146,393 @@ function handlePngSelected(file) {
 setupDragAndDrop(pdfDropZone, pdfInput, 'pdf', handlePdfSelected);
 setupDragAndDrop(pngDropZone, pngInput, 'png', handlePngSelected);
 
-// --- State and Preview Updates ---
-
-// Update Alignment
-alignButtons.forEach(button => {
-    button.addEventListener('click', () => {
-        alignButtons.forEach(btn => btn.classList.remove('active'));
-        button.classList.add('active');
-        
-        state.alignment = button.getAttribute('data-align');
+alignButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+        alignButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.alignment = btn.getAttribute('data-align');
         updatePreview();
     });
 });
 
-// Update Scale Slider
 scaleSlider.addEventListener('input', (e) => {
     state.scale = parseInt(e.target.value);
     scaleVal.textContent = `${state.scale}%`;
     updatePreview();
 });
 
-// Update Margin Slider
 marginSlider.addEventListener('input', (e) => {
     state.topMargin = parseInt(e.target.value);
     marginVal.textContent = `${state.topMargin}px`;
     updatePreview();
 });
 
-// Update Toggles
-shrinkContentCheckbox.addEventListener('change', (e) => {
-    state.shrinkContent = e.target.checked;
-    updatePreview();
-});
+shrinkContentCheckbox.addEventListener('change', (e) => { state.shrinkContent = e.target.checked; updatePreview(); });
+skipFirstCheckbox.addEventListener('change', (e) => { state.skipFirst = e.target.checked; });
+skipLastCheckbox.addEventListener('change', (e) => { state.skipLast = e.target.checked; });
 
-skipFirstCheckbox.addEventListener('change', (e) => {
-    state.skipFirst = e.target.checked;
-});
-
-skipLastCheckbox.addEventListener('change', (e) => {
-    state.skipLast = e.target.checked;
-});
-
-// Update Live Preview Mockup Styles
 function updatePreview() {
-    // Alignment mapping to flex layout
     let flexAlign = 'flex-start';
     if (state.alignment === 'center') flexAlign = 'center';
-    if (state.alignment === 'right') flexAlign = 'flex-end';
-    
-    // Scale Margin for preview A4 sheet
-    // PDF A4 height = 842 points. Preview A4 height = 353px. (ratio ~0.42)
-    // Scale top margin to look visually equivalent
+    if (state.alignment === 'right')  flexAlign = 'flex-end';
     const previewMargin = Math.max(0, state.topMargin * 0.42);
-    
-    a4Sheet.style.setProperty('--preview-align', flexAlign);
-    a4Sheet.style.setProperty('--preview-scale', `${state.scale}%`);
+    a4Sheet.style.setProperty('--preview-align',  flexAlign);
+    a4Sheet.style.setProperty('--preview-scale',  `${state.scale}%`);
     a4Sheet.style.setProperty('--preview-margin', `${previewMargin}px`);
-    
-    // Dynamic height based on image aspect ratio
     let previewHeight = 24;
     if (state.aspectRatio) {
-        // A4 sheet width in CSS is 250px
-        const previewWidth = 250 * (state.scale / 100);
-        previewHeight = previewWidth * state.aspectRatio;
+        previewHeight = 250 * (state.scale / 100) * state.aspectRatio;
         a4Sheet.style.setProperty('--preview-height', `${previewHeight}px`);
     } else {
         a4Sheet.style.setProperty('--preview-height', '24px');
     }
-
-    // Shrink content mockup preview
     if (state.shrinkContent) {
         a4Sheet.classList.add('shrink-active');
-        // Total height taken by header in preview
-        const totalHeaderHeight = previewMargin + previewHeight + 10;
-        const contentHeight = 300; // estimated mock content container height
-        const scaleFactor = Math.max(0.65, Math.min(1.0, (contentHeight - totalHeaderHeight) / contentHeight));
-        a4Sheet.style.setProperty('--preview-shrink-scale', scaleFactor);
+        const sf = Math.max(0.65, Math.min(1.0, (300 - previewMargin - previewHeight - 10) / 300));
+        a4Sheet.style.setProperty('--preview-shrink-scale', sf);
     } else {
         a4Sheet.classList.remove('shrink-active');
         a4Sheet.style.setProperty('--preview-shrink-scale', '1.0');
     }
 }
 
-// Enable/Disable Action Button
 function checkReadyState() {
     if (state.pdfFile && state.pngFile) {
         processBtn.removeAttribute('disabled');
-        statusMessage.textContent = 'Sẵn sàng xử lý. Nhấp nút phía trên để bắt đầu.';
+        statusMessage.textContent = 'Ready. Click the button to start.';
         statusMessage.style.color = 'var(--success-color)';
     } else {
         processBtn.setAttribute('disabled', 'true');
-        statusMessage.textContent = 'Vui lòng tải lên đầy đủ file PDF và ảnh PNG để bắt đầu.';
+        statusMessage.textContent = 'Vui lòng tải lên đầy đủ file PDF và ảnh PNG.';
         statusMessage.style.color = 'var(--text-secondary)';
     }
 }
 
-// Initialize Preview
 updatePreview();
-
-// --- PDF Processing and Generation ---
 
 processBtn.addEventListener('click', async () => {
     if (!state.pdfFile || !state.pngFile) return;
-
     try {
-        // Show overlay loader
         loadingOverlay.classList.add('active');
-        updateProgress(10, 'Đang đọc dữ liệu file...');
-
-        // Read files as ArrayBuffer
+        loaderTitle.textContent = 'Đang chèn Header...';
+        updateProgress(10, 'Reading files...');
         const pdfBytes = await readFileAsArrayBuffer(state.pdfFile);
-        updateProgress(30, 'Đang giải mã PDF...');
-
+        updateProgress(30, 'Parsing PDF...');
         const pngBytes = await readFileAsArrayBuffer(state.pngFile);
-        updateProgress(40, 'Đang nạp thư viện PDF-lib...');
-
-        // Load PDF Document
+        updateProgress(45, 'Loading pdf-lib...');
         const { PDFDocument } = PDFLib;
         const pdfDoc = await PDFDocument.load(pdfBytes);
-        updateProgress(55, 'Đang nhúng hình ảnh PNG...');
-
         const pages = pdfDoc.getPages();
         const totalPages = pages.length;
-
-        let destPdfDoc;
-        let pngImage;
-        let embeddedPages = [];
+        let destDoc, pngImage, embeddedPages = [];
 
         if (state.shrinkContent) {
-            destPdfDoc = await PDFDocument.create();
-            try {
-                pngImage = await destPdfDoc.embedPng(pngBytes);
-            } catch (embedError) {
-                throw new Error('Ảnh PNG không hợp lệ hoặc bị hỏng. Hãy chọn file ảnh PNG chuẩn.');
-            }
-            updateProgress(60, 'Đang chuẩn bị nhúng các trang tài liệu gốc...');
-            const pageIndices = Array.from({ length: totalPages }, (_, idx) => idx);
-            embeddedPages = await destPdfDoc.embedPdf(pdfDoc, pageIndices);
+            destDoc = await PDFDocument.create();
+            try { pngImage = await destDoc.embedPng(pngBytes); } catch { throw new Error('Invalid PNG.'); }
+            updateProgress(60, 'Embedding pages...');
+            embeddedPages = await destDoc.embedPdf(pdfDoc, Array.from({ length: totalPages }, (_, i) => i));
         } else {
-            destPdfDoc = pdfDoc;
-            try {
-                pngImage = await destPdfDoc.embedPng(pngBytes);
-            } catch (embedError) {
-                throw new Error('Ảnh PNG không hợp lệ hoặc bị hỏng. Hãy chọn file ảnh PNG chuẩn.');
-            }
+            destDoc = pdfDoc;
+            try { pngImage = await destDoc.embedPng(pngBytes); } catch { throw new Error('Invalid PNG.'); }
         }
 
-        const { width: imgOriginalWidth, height: imgOriginalHeight } = pngImage.scale(1.0);
-        updateProgress(65, 'Đang chèn Header vào các trang...');
+        const { width: imgW, height: imgH } = pngImage.scale(1.0);
+        updateProgress(65, 'Inserting headers...');
 
-        // Process each page
         for (let i = 0; i < totalPages; i++) {
-            const originalPage = pages[i];
-            const cropBox = originalPage.getCropBox();
-            const cropX = cropBox.x;
-            const cropY = cropBox.y;
-            const cropWidth = cropBox.width;
-            const cropHeight = cropBox.height;
-
-            const isSkipped = (state.skipFirst && i === 0) || (state.skipLast && i === totalPages - 1);
+            const origPage = pages[i];
+            const cb = origPage.getCropBox();
+            const [cropX, cropY, cropW, cropH] = [cb.x, cb.y, cb.width, cb.height];
+            const skipped = (state.skipFirst && i === 0) || (state.skipLast && i === totalPages - 1);
 
             if (state.shrinkContent) {
-                // Add a blank page to destination matching original dimensions
-                const newPage = destPdfDoc.addPage([originalPage.getWidth(), originalPage.getHeight()]);
-                newPage.setCropBox(cropX, cropY, cropWidth, cropHeight);
-
-                if (isSkipped) {
-                    // Draw original page at full size
-                    newPage.drawPage(embeddedPages[i], {
-                        x: 0,
-                        y: 0,
-                        width: originalPage.getWidth(),
-                        height: originalPage.getHeight()
-                    });
+                const newPage = destDoc.addPage([origPage.getWidth(), origPage.getHeight()]);
+                newPage.setCropBox(cropX, cropY, cropW, cropH);
+                if (skipped) {
+                    newPage.drawPage(embeddedPages[i], { x: 0, y: 0, width: origPage.getWidth(), height: origPage.getHeight() });
                 } else {
-                    // Calculate dimensions for header
-                    const targetWidth = cropWidth * (state.scale / 100);
-                    const targetHeight = (imgOriginalHeight / imgOriginalWidth) * targetWidth;
-
-                    // Space reserved for header: topMargin + headerHeight + 15pt spacing
-                    const headerHeightTotal = state.topMargin + targetHeight + 15;
-
-                    // Calculate scale factor for main content
-                    const scaleFactor = Math.max(0.1, (cropHeight - headerHeightTotal) / cropHeight);
-
-                    // Compute scaled page dimensions
-                    const drawWidth = originalPage.getWidth() * scaleFactor;
-                    const drawHeight = originalPage.getHeight() * scaleFactor;
-
-                    // Center horizontal offset in CropBox
-                    const newCropBoxX = cropX + (cropWidth - cropWidth * scaleFactor) / 2;
-                    const newCropBoxY = cropY;
-
-                    // MediaBox offsets mapping
-                    const drawX = newCropBoxX - (cropX * scaleFactor);
-                    const drawY = newCropBoxY - (cropY * scaleFactor);
-
-                    // Draw scaled down page content
-                    newPage.drawPage(embeddedPages[i], {
-                        x: drawX,
-                        y: drawY,
-                        width: drawWidth,
-                        height: drawHeight
-                    });
-
-                    // Draw the PNG header on top
-                    let headerX = cropX;
-                    if (state.alignment === 'center') {
-                        headerX = cropX + (cropWidth - targetWidth) / 2;
-                    } else if (state.alignment === 'right') {
-                        headerX = cropX + cropWidth - targetWidth;
-                    }
-
-                    const headerY = cropY + cropHeight - state.topMargin - targetHeight;
-
-                    newPage.drawImage(pngImage, {
-                        x: headerX,
-                        y: headerY,
-                        width: targetWidth,
-                        height: targetHeight
-                    });
+                    const tw = cropW * (state.scale / 100);
+                    const th = (imgH / imgW) * tw;
+                    const sf = Math.max(0.1, (cropH - state.topMargin - th - 15) / cropH);
+                    const dW = origPage.getWidth() * sf, dH = origPage.getHeight() * sf;
+                    const dX = cropX + (cropW - cropW * sf) / 2 - cropX * sf;
+                    const dY = cropY - cropY * sf;
+                    newPage.drawPage(embeddedPages[i], { x: dX, y: dY, width: dW, height: dH });
+                    let hx = cropX;
+                    if (state.alignment === 'center') hx = cropX + (cropW - tw) / 2;
+                    else if (state.alignment === 'right') hx = cropX + cropW - tw;
+                    newPage.drawImage(pngImage, { x: hx, y: cropY + cropH - state.topMargin - th, width: tw, height: th });
                 }
             } else {
-                if (isSkipped) continue;
-
-                const targetWidth = cropWidth * (state.scale / 100);
-                const targetHeight = (imgOriginalHeight / imgOriginalWidth) * targetWidth;
-
+                if (skipped) continue;
+                const tw = cropW * (state.scale / 100), th = (imgH / imgW) * tw;
                 let x = cropX;
-                if (state.alignment === 'center') {
-                    x = cropX + (cropWidth - targetWidth) / 2;
-                } else if (state.alignment === 'right') {
-                    x = cropX + cropWidth - targetWidth;
-                }
-
-                const y = cropY + cropHeight - state.topMargin - targetHeight;
-
-                originalPage.drawImage(pngImage, {
-                    x: x,
-                    y: y,
-                    width: targetWidth,
-                    height: targetHeight
-                });
+                if (state.alignment === 'center') x = cropX + (cropW - tw) / 2;
+                else if (state.alignment === 'right') x = cropX + cropW - tw;
+                origPage.drawImage(pngImage, { x, y: cropY + cropH - state.topMargin - th, width: tw, height: th });
             }
-
-            // Update progressive processing progress
-            const pageProgress = 65 + Math.floor((i + 1) / totalPages * 25);
-            updateProgress(pageProgress, `Đang xử lý trang ${i + 1}/${totalPages}...`);
+            updateProgress(65 + Math.floor((i + 1) / totalPages * 25), `Page ${i + 1}/${totalPages}...`);
         }
 
-        updateProgress(90, 'Đang chuẩn bị file tải xuống...');
-
-        // Save modified PDF
-        const pdfBytesModified = await destPdfDoc.save();
-        updateProgress(98, 'Đang tải xuống...');
-
-
-        // Create Blob and trigger download
-        const blob = new Blob([pdfBytesModified], { type: 'application/pdf' });
+        updateProgress(92, 'Saving PDF...');
+        const outBytes = await destDoc.save();
+        updateProgress(98, 'Downloading...');
+        const blob = new Blob([outBytes], { type: 'application/pdf' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        
-        // Generate new file name
-        const cleanName = state.pdfFileName.replace(/\.pdf$/i, '');
-        link.download = `${cleanName}_co_header.pdf`;
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        setTimeout(() => {
-            loadingOverlay.classList.remove('active');
-            showToast('Chèn Header và tải PDF thành công!', 'success');
-        }, 800);
-
-    } catch (error) {
-        console.error(error);
+        link.download = `${state.pdfFileName.replace(/\.pdf$/i, '')}_with_header.pdf`;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        setTimeout(() => { loadingOverlay.classList.remove('active'); loaderTitle.textContent = 'Đang xử lý...'; showToast('Header added successfully!', 'success'); }, 800);
+    } catch (err) {
+        console.error(err);
         loadingOverlay.classList.remove('active');
-        showToast(error.message || 'Đã xảy ra lỗi khi xử lý PDF!', 'error');
+        loaderTitle.textContent = 'Đang xử lý...';
+        showToast(err.message || 'An error occurred!', 'error');
     }
 });
 
-// Helper: Read file as ArrayBuffer
-function readFileAsArrayBuffer(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error(`Không thể đọc file: ${file.name}`));
-        reader.readAsArrayBuffer(file);
-    });
+// =====================================================
+// TAB 2 – CV SUMMARY
+// =====================================================
+
+// Setup pdf.js worker
+if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 }
 
-// Helper: Update Progress Overlay
-function updateProgress(percent, subtitle) {
-    progressBar.style.width = `${percent}%`;
-    if (subtitle) {
-        loaderSubtitle.textContent = subtitle;
+function handleCvPdfSelected(file) {
+    cvState.pdfFile = file; cvState.pdfFileName = file.name;
+    cvPdfNameDisplay.textContent = file.name;
+    cvPdfDropZone.classList.add('has-file');
+    showToast('CV PDF loaded!', 'success');
+    checkCvReadyState();
+}
+
+function handleCvPngSelected(file) {
+    cvState.pngFile = file; cvState.pngFileName = file.name;
+    cvPngNameDisplay.textContent = file.name;
+    cvPngDropZone.classList.add('has-file');
+    showToast('Header PNG loaded!', 'success');
+    checkCvReadyState();
+}
+
+setupDragAndDrop(cvPdfDropZone, cvPdfInput, 'pdf', handleCvPdfSelected);
+setupDragAndDrop(cvPngDropZone, cvPngInput, 'png', handleCvPngSelected);
+
+// Live preview binding
+const previewMap = [
+    ['cv-name',            'prev-name'],
+    ['cv-position',        'prev-position'],
+    ['cv-profile-summary', 'prev-summary'],
+    ['cv-skills',          'prev-skills'],
+    ['cv-english',         'prev-english'],
+    ['cv-notice',          'prev-notice'],
+];
+previewMap.forEach(([inputId, previewId]) => {
+    const inp = document.getElementById(inputId);
+    const prv = document.getElementById(previewId);
+    if (inp && prv) inp.addEventListener('input', () => { prv.textContent = inp.value || '—'; });
+});
+
+function checkCvReadyState() {
+    if (cvState.pdfFile && cvState.pngFile) {
+        cvGenerateBtn.removeAttribute('disabled');
+        cvStatusMessage.textContent = 'Ready. Fill in the summary and click Generate.';
+        cvStatusMessage.style.color = 'var(--success-color)';
+    } else {
+        cvGenerateBtn.setAttribute('disabled', 'true');
+        cvStatusMessage.textContent = 'Upload CV PDF và Header PNG để bắt đầu.';
+        cvStatusMessage.style.color = 'var(--text-secondary)';
     }
 }
+
+// Text wrap helper for pdf-lib
+function wrapText(text, maxWidth, font, size) {
+    if (!text || !text.trim()) return ['—'];
+    const lines = [];
+    for (const para of text.split('\n')) {
+        if (!para.trim()) { lines.push(''); continue; }
+        let line = '';
+        for (const word of para.split(/\s+/)) {
+            const test = line ? `${line} ${word}` : word;
+            let w = maxWidth + 1;
+            try { w = font.widthOfTextAtSize(test, size); } catch {}
+            if (w > maxWidth && line) { lines.push(line); line = word; }
+            else line = test;
+        }
+        if (line) lines.push(line);
+    }
+    return lines.length ? lines : ['—'];
+}
+
+// =====================================================
+// GENERATE CV REPORT PDF
+// =====================================================
+cvGenerateBtn.addEventListener('click', async () => {
+    if (!cvState.pdfFile || !cvState.pngFile) return;
+
+    const form = {
+        name:     document.getElementById('cv-name').value,
+        position: document.getElementById('cv-position').value,
+        summary:  document.getElementById('cv-profile-summary').value,
+        skills:   document.getElementById('cv-skills').value,
+        english:  document.getElementById('cv-english').value,
+        notice:   document.getElementById('cv-notice').value,
+    };
+
+    try {
+        loadingOverlay.classList.add('active');
+        loaderTitle.textContent = 'Generating CV Report...';
+        updateProgress(5, 'Reading files...');
+
+        const pdfBytes = await readFileAsArrayBuffer(cvState.pdfFile);
+        const pngBytes = await readFileAsArrayBuffer(cvState.pngFile);
+        updateProgress(15, 'Creating document...');
+
+        const { PDFDocument, StandardFonts, rgb } = PDFLib;
+        const outDoc  = await PDFDocument.create();
+        const boldFont= await outDoc.embedFont(StandardFonts.HelveticaBold);
+        const regFont = await outDoc.embedFont(StandardFonts.Helvetica);
+
+        let pngImage;
+        try { pngImage = await outDoc.embedPng(pngBytes); } catch { throw new Error('Invalid PNG file.'); }
+        const pngDims = pngImage.scale(1);
+
+        const A4W = 595.28, A4H = 841.89;
+        const hdrH = (pngDims.height / pngDims.width) * A4W; // header height at A4 width
+
+        // Color palette — #42B0D5 accent
+        const C = {
+            white:    rgb(1,      1,      1     ),
+            accent:   rgb(0.259,  0.690,  0.835 ), // #42B0D5
+            accentDk: rgb(0.18,   0.50,   0.64  ), // darker shade
+            darkText: rgb(0.12,   0.15,   0.22  ),
+            grayText: rgb(0.50,   0.55,   0.65  ),
+            row1:     rgb(0.95,   0.96,   0.98  ),
+            row2:     rgb(0.98,   0.99,   1.00  ),
+            border:   rgb(0.80,   0.84,   0.90  ),
+        };
+
+        updateProgress(30, 'Drawing summary table...');
+
+        // ── SUMMARY TABLE PAGE ──────────────────────────
+        const sumPage = outDoc.addPage([A4W, A4H]);
+        sumPage.drawRectangle({ x: 0, y: 0, width: A4W, height: A4H, color: C.white });
+        sumPage.drawImage(pngImage, { x: 0, y: A4H - hdrH, width: A4W, height: hdrH });
+
+        // Title
+        const stTitleY = A4H - hdrH - 42;
+        const stTitle  = 'CANDIDATE SUMMARY', stSz = 15;
+        const stW = boldFont.widthOfTextAtSize(stTitle, stSz);
+        sumPage.drawText(stTitle, { x: (A4W - stW) / 2, y: stTitleY, font: boldFont, size: stSz, color: C.accentDk });
+        sumPage.drawLine({ start: { x: 40, y: stTitleY - 10 }, end: { x: A4W - 40, y: stTitleY - 10 }, thickness: 1.5, color: C.accent });
+
+        // Table settings
+        const tblX = 40, tblW = A4W - 80, col1W = 148, col2W = tblW - col1W;
+        const cellPad = 9, lineH = 13, minRowH = 34;
+        let curY = stTitleY - 28;
+
+        const rows = [
+            ['Name',            form.name],
+            ['Position Applied',form.position],
+            ['Profile Summary', form.summary],
+            ['Top Skills',      form.skills],
+            ['English',         form.english],
+            ['Notice Period',   form.notice],
+        ];
+
+        rows.forEach(([label, value], idx) => {
+            const lines  = wrapText(value, col2W - cellPad * 2, regFont, 10);
+            const rowH   = Math.max(minRowH, lines.length * lineH + cellPad * 2);
+            const rowY   = curY - rowH;
+            const bgFill = idx % 2 === 0 ? C.row1 : C.row2;
+
+            // Label cell
+            sumPage.drawRectangle({ x: tblX, y: rowY, width: col1W, height: rowH, color: C.accent });
+            // Value cell
+            sumPage.drawRectangle({ x: tblX + col1W, y: rowY, width: col2W, height: rowH, color: bgFill });
+            // Row separator
+            sumPage.drawLine({ start: { x: tblX, y: rowY }, end: { x: tblX + tblW, y: rowY }, thickness: 0.4, color: C.border });
+
+            // Label text — left-aligned with padding
+            const lblSz = 10;
+            sumPage.drawText(label, {
+                x: tblX + cellPad,
+                y: rowY + rowH / 2 - lblSz / 2,
+                font: boldFont, size: lblSz, color: C.white,
+            });
+
+            // Value text
+            lines.forEach((ln, li) => {
+                if (ln.trim()) {
+                    sumPage.drawText(ln, {
+                        x: tblX + col1W + cellPad,
+                        y: rowY + rowH - cellPad - 10 - li * lineH,
+                        font: regFont, size: 10, color: C.darkText,
+                    });
+                }
+            });
+            curY -= rowH;
+        });
+
+        // Table borders (outer + column divider)
+        const tblStartY = stTitleY - 28;
+        [[tblX, tblStartY, tblX, curY], [tblX + tblW, tblStartY, tblX + tblW, curY],
+         [tblX, curY, tblX + tblW, curY], [tblX + col1W, tblStartY, tblX + col1W, curY]]
+            .forEach(([x1, y1, x2, y2]) =>
+                sumPage.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: 0.5, color: C.border }));
+
+        updateProgress(60, 'Embedding CV pages...');
+
+        // ── PAGES 3+: ORIGINAL CV WITH HEADER ─────────
+        const origDoc   = await PDFDocument.load(pdfBytes);
+        const origPages = origDoc.getPages();
+        const total     = origPages.length;
+        const embedded  = await outDoc.embedPdf(origDoc, Array.from({ length: total }, (_, i) => i));
+
+        for (let i = 0; i < total; i++) {
+            const op  = origPages[i];
+            const cb  = op.getCropBox();
+            const [cX, cY, cW, cH] = [cb.x, cb.y, cb.width, cb.height];
+
+            const newPage = outDoc.addPage([op.getWidth(), op.getHeight()]);
+            newPage.setCropBox(cX, cY, cW, cH);
+
+            // Header height scaled to this page's crop width
+            const phH    = (pngDims.height / pngDims.width) * cW;
+            const sf     = Math.max(0.5, (cH - phH - 12) / cH);
+            const dW     = op.getWidth()  * sf;
+            const dH     = op.getHeight() * sf;
+            const dX     = cX + (cW - cW * sf) / 2 - cX * sf;
+            const dY     = cY - cY * sf;
+
+            newPage.drawPage(embedded[i], { x: dX, y: dY, width: dW, height: dH });
+            newPage.drawImage(pngImage, { x: cX, y: cY + cH - phH, width: cW, height: phH });
+
+            updateProgress(60 + Math.floor((i + 1) / total * 30), `CV page ${i + 1}/${total}...`);
+        }
+
+        updateProgress(93, 'Saving report...');
+        const outBytes = await outDoc.save();
+        updateProgress(98, 'Downloading...');
+
+        const blob = new Blob([outBytes], { type: 'application/pdf' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${cvState.pdfFileName.replace(/\.pdf$/i, '')}_CV_Report.pdf`;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+
+        setTimeout(() => {
+            loadingOverlay.classList.remove('active');
+            loaderTitle.textContent = 'Đang xử lý tài liệu...';
+            showToast('CV Report generated successfully!', 'success');
+        }, 800);
+
+    } catch (err) {
+        console.error(err);
+        loadingOverlay.classList.remove('active');
+        loaderTitle.textContent = 'Đang xử lý tài liệu...';
+        showToast(err.message || 'An error occurred!', 'error');
+    }
+});
