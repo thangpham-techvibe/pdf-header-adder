@@ -421,15 +421,21 @@ cvGenerateBtn.addEventListener('click', async () => {
         sumPage.drawRectangle({ x: 0, y: 0, width: A4W, height: A4H, color: C.white });
         sumPage.drawImage(pngImage, { x: 0, y: A4H - hdrH, width: A4W, height: hdrH });
 
-        // Table settings (directly below header)
-        const tblX = 40, tblW = A4W - 80, col1W = 148, col2W = tblW - col1W;
-        const cellPad = 9, lineH = 13, minRowH = 34;
-        const tblStartY = A4H - hdrH - 50;
-        let curY = tblStartY;
-
-        // Custom branding colors matching the design
+        // Title: CANDIDATE SUMMARY
         const blueText = rgb(0.106, 0.459, 0.733); // #1b75bb
-        const blackColor = rgb(0, 0, 0);
+        const stTitleY = A4H - hdrH - 45;
+        const stTitle  = 'CANDIDATE SUMMARY', stSz = 16;
+        const stW = boldFont.widthOfTextAtSize(stTitle, stSz);
+        sumPage.drawText(stTitle, { x: (A4W - stW) / 2, y: stTitleY, font: boldFont, size: stSz, color: blueText });
+
+        // Blue underline spanning table width
+        const tblX = 40, tblW = A4W - 80, col1W = 148, col2W = tblW - col1W;
+        sumPage.drawLine({ start: { x: tblX, y: stTitleY - 12 }, end: { x: tblX + tblW, y: stTitleY - 12 }, thickness: 1.5, color: blueText });
+
+        // Table settings (directly below underline)
+        const cellPad = 9, lineH = 13, minRowH = 34;
+        const tblStartY = stTitleY - 32;
+        let curY = tblStartY;
 
         const rows = [
             ['Name',            form.name],
@@ -441,45 +447,45 @@ cvGenerateBtn.addEventListener('click', async () => {
         ];
 
         rows.forEach(([label, value], idx) => {
-            const valFont = idx < 2 ? boldFont : regFont;
-            const lines  = wrapText(value, col2W - cellPad * 2, valFont, 10);
+            const lines  = wrapText(value, col2W - cellPad * 2, regFont, 10);
             const rowH   = Math.max(minRowH, lines.length * lineH + cellPad * 2);
             const rowY   = curY - rowH;
+            // Alternating zebra striping: Row 1, 3, 5 are light blue/grey, Row 2, 4, 6 are white
+            const bgFill = idx % 2 === 0 ? C.row1 : C.white;
 
-            // Draw white background for cells
-            sumPage.drawRectangle({ x: tblX, y: rowY, width: col1W, height: rowH, color: C.white });
-            sumPage.drawRectangle({ x: tblX + col1W, y: rowY, width: col2W, height: rowH, color: C.white });
+            // Draw backgrounds for cells
+            sumPage.drawRectangle({ x: tblX, y: rowY, width: col1W, height: rowH, color: C.accent }); // Label cell (Accent: #42b0d5)
+            sumPage.drawRectangle({ x: tblX + col1W, y: rowY, width: col2W, height: rowH, color: bgFill }); // Value cell (White / Light blue-grey)
 
             // Row separator (bottom line of current row)
-            sumPage.drawLine({ start: { x: tblX, y: rowY }, end: { x: tblX + tblW, y: rowY }, thickness: 0.8, color: blackColor });
+            sumPage.drawLine({ start: { x: tblX, y: rowY }, end: { x: tblX + tblW, y: rowY }, thickness: 0.6, color: C.border });
 
-            // Label text — bold & blue
+            // Label text — bold & white (vertically centered)
             const lblSz = 10;
             sumPage.drawText(label, {
                 x: tblX + cellPad,
                 y: rowY + rowH / 2 - lblSz / 2,
-                font: boldFont, size: lblSz, color: blueText,
+                font: boldFont, size: lblSz, color: C.white,
             });
 
-            // Value text (first two rows in blue & bold, others in black & regular)
-            const valColor = idx < 2 ? blueText : blackColor;
+            // Value text — dark text & regular font (always)
             lines.forEach((ln, li) => {
                 if (ln.trim()) {
                     sumPage.drawText(ln, {
                         x: tblX + col1W + cellPad,
                         y: rowY + rowH - cellPad - 10 - li * lineH,
-                        font: valFont, size: 10, color: valColor,
+                        font: regFont, size: 10, color: C.darkText,
                     });
                 }
             });
             curY -= rowH;
         });
 
-        // Table borders (Top line + outer borders + column divider)
-        sumPage.drawLine({ start: { x: tblX, y: tblStartY }, end: { x: tblX + tblW, y: tblStartY }, thickness: 0.8, color: blackColor }); // Top line
-        sumPage.drawLine({ start: { x: tblX, y: tblStartY }, end: { x: tblX, y: curY }, thickness: 0.8, color: blackColor }); // Left outer border
-        sumPage.drawLine({ start: { x: tblX + tblW, y: tblStartY }, end: { x: tblX + tblW, y: curY }, thickness: 0.8, color: blackColor }); // Right outer border
-        sumPage.drawLine({ start: { x: tblX + col1W, y: tblStartY }, end: { x: tblX + col1W, y: curY }, thickness: 0.8, color: blackColor }); // Column divider
+        // Table borders (Top line + outer borders + column divider using C.border)
+        sumPage.drawLine({ start: { x: tblX, y: tblStartY }, end: { x: tblX + tblW, y: tblStartY }, thickness: 0.6, color: C.border }); // Top line
+        sumPage.drawLine({ start: { x: tblX, y: tblStartY }, end: { x: tblX, y: curY }, thickness: 0.6, color: C.border }); // Left outer border
+        sumPage.drawLine({ start: { x: tblX + tblW, y: tblStartY }, end: { x: tblX + tblW, y: curY }, thickness: 0.6, color: C.border }); // Right outer border
+        sumPage.drawLine({ start: { x: tblX + col1W, y: tblStartY }, end: { x: tblX + col1W, y: curY }, thickness: 0.6, color: C.border }); // Column divider
 
         // ── DRAW FOOTER GRADIENT (Page 1 Only) ──────────
         const N = 100;
