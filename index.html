@@ -3,16 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Header Adder - Chèn Header Tự Động Vào PDF</title>
-    <!-- Google Fonts -->
+    <title>PDF Smart Tools - Header Adder & CV Summary</title>
+    <meta name="description" content="Bộ công cụ PDF chuyên nghiệp: Chèn Header tự động và tạo Hồ Sơ Ứng Viên chuẩn.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- CSS Style -->
     <link rel="stylesheet" href="styles.css">
-    <!-- PDF-Lib Library -->
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 </head>
 <body>
@@ -21,198 +18,271 @@
     <div class="glow glow-2"></div>
 
     <main class="app-container">
-        <!-- Header -->
+        <!-- App Header -->
         <header class="app-header">
             <div class="logo">
                 <i data-lucide="file-type-2" class="logo-icon"></i>
-                <h1>PDF <span>Header Adder</span></h1>
+                <h1>PDF <span>Smart Tools</span></h1>
             </div>
-            <p class="subtitle">Chèn ảnh header định dạng PNG vào mỗi trang PDF khổ A4 nhanh chóng, bảo mật và trực quan.</p>
+            <p class="subtitle">Bộ công cụ xử lý PDF chuyên nghiệp: Chèn Header tự động & Tạo hồ sơ ứng viên chuẩn.</p>
         </header>
 
-        <div class="app-layout">
-            <!-- Left Panel: Uploads and Controls -->
-            <section class="control-panel">
-                <!-- Drop zones in a grid -->
-                <div class="upload-grid">
-                    <!-- PDF Drop Zone -->
-                    <div class="drop-zone" id="pdf-drop-zone">
-                        <input type="file" id="pdf-input" accept=".pdf" class="file-input">
-                        <div class="drop-zone-content">
-                            <div class="icon-wrapper pdf-icon">
-                                <i data-lucide="file-text"></i>
+        <!-- Tab Navigation -->
+        <nav class="tab-nav" role="tablist">
+            <button class="tab-btn active" data-tab="header-adder" role="tab" id="tab-btn-header-adder">
+                <i data-lucide="image-plus"></i>
+                <span>Header Adder</span>
+            </button>
+            <button class="tab-btn" data-tab="cv-summary" role="tab" id="tab-btn-cv-summary">
+                <i data-lucide="user-check"></i>
+                <span>CV Summary</span>
+            </button>
+        </nav>
+
+        <!-- ======================================== -->
+        <!-- TAB 1: HEADER ADDER                      -->
+        <!-- ======================================== -->
+        <div class="tab-content active" id="tab-header-adder" role="tabpanel">
+            <div class="app-layout">
+                <!-- Left Panel -->
+                <section class="control-panel">
+                    <div class="upload-grid">
+                        <div class="drop-zone" id="pdf-drop-zone">
+                            <input type="file" id="pdf-input" accept=".pdf" class="file-input">
+                            <div class="drop-zone-content">
+                                <div class="icon-wrapper pdf-icon"><i data-lucide="file-text"></i></div>
+                                <h3>Chọn file tài liệu PDF</h3>
+                                <p class="drop-info">Kéo thả hoặc click để chọn file PDF</p>
+                                <span class="file-name-display" id="pdf-name">Chưa có file nào được chọn</span>
                             </div>
-                            <h3>Chọn file tài liệu PDF</h3>
-                            <p class="drop-info">Kéo thả hoặc click để chọn file PDF</p>
-                            <span class="file-name-display" id="pdf-name">Chưa có file nào được chọn</span>
                         </div>
-                    </div>
-
-                    <!-- PNG Drop Zone -->
-                    <div class="drop-zone" id="png-drop-zone">
-                        <input type="file" id="png-input" accept=".png" class="file-input">
-                        <div class="drop-zone-content">
-                            <div class="icon-wrapper png-icon">
-                                <i data-lucide="image"></i>
+                        <div class="drop-zone" id="png-drop-zone">
+                            <input type="file" id="png-input" accept=".png" class="file-input">
+                            <div class="drop-zone-content">
+                                <div class="icon-wrapper png-icon"><i data-lucide="image"></i></div>
+                                <h3>Chọn ảnh Header PNG</h3>
+                                <p class="drop-info">Kéo thả hoặc click để chọn ảnh PNG</p>
+                                <span class="file-name-display" id="png-name">Chưa có file nào được chọn</span>
                             </div>
-                            <h3>Chọn ảnh Header PNG</h3>
-                            <p class="drop-info">Kéo thả hoặc click để chọn ảnh PNG</p>
-                            <span class="file-name-display" id="png-name">Chưa có file nào được chọn</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Customizations -->
-                <div class="settings-card glass-panel">
-                    <h2 class="settings-title"><i data-lucide="sliders"></i> Cấu hình chèn Header</h2>
-                    
-                    <!-- Alignment Control -->
-                    <div class="control-group">
-                        <label class="control-label">Căn lề ngang</label>
-                        <div class="align-selector">
-                            <button type="button" class="align-btn active" data-align="left" title="Căn trái">
-                                <i data-lucide="align-left"></i>
-                                <span>Trái</span>
-                            </button>
-                            <button type="button" class="align-btn" data-align="center" title="Căn giữa">
-                                <i data-lucide="align-center"></i>
-                                <span>Giữa</span>
-                            </button>
-                            <button type="button" class="align-btn" data-align="right" title="Căn phải">
-                                <i data-lucide="align-right"></i>
-                                <span>Phải</span>
-                            </button>
                         </div>
                     </div>
 
-                    <!-- Scale Slider -->
-                    <div class="control-group">
-                        <div class="label-with-value">
-                            <label for="header-scale" class="control-label">Kích thước Header (Scale)</label>
-                            <span class="value-badge" id="scale-val">50%</span>
-                        </div>
-                        <input type="range" id="header-scale" min="5" max="100" value="50" class="range-slider">
-                        <div class="slider-ticks">
-                            <span>Nhỏ (5%)</span>
-                            <span>Trung bình</span>
-                            <span>Lớn (100%)</span>
-                        </div>
-                    </div>
-
-                    <!-- Top Margin Slider -->
-                    <div class="control-group">
-                        <div class="label-with-value">
-                            <label for="header-margin" class="control-label">Khoảng cách lề trên (Top Margin)</label>
-                            <span class="value-badge" id="margin-val">20px</span>
-                        </div>
-                        <input type="range" id="header-margin" min="0" max="150" value="20" class="range-slider">
-                        <div class="slider-ticks">
-                            <span>Sát mép (0px)</span>
-                            <span>Xa (150px)</span>
-                        </div>
-                    </div>
-
-                    <!-- Skip Options -->
-                    <div class="toggle-group">
-                        <div class="toggle-item">
-                            <div class="toggle-info">
-                                <span class="toggle-label">Co nhỏ nội dung gốc</span>
-                                <span class="toggle-sub">Co nhỏ trang để không bị Header đè lên chữ</span>
+                    <div class="settings-card glass-panel">
+                        <h2 class="settings-title"><i data-lucide="sliders"></i> Cấu hình chèn Header</h2>
+                        <div class="control-group">
+                            <label class="control-label">Căn lề ngang</label>
+                            <div class="align-selector">
+                                <button type="button" class="align-btn active" data-align="left"><i data-lucide="align-left"></i><span>Trái</span></button>
+                                <button type="button" class="align-btn" data-align="center"><i data-lucide="align-center"></i><span>Giữa</span></button>
+                                <button type="button" class="align-btn" data-align="right"><i data-lucide="align-right"></i><span>Phải</span></button>
                             </div>
-                            <label class="switch">
-                                <input type="checkbox" id="shrink-content" checked>
-                                <span class="slider-round"></span>
-                            </label>
                         </div>
-                        <div class="toggle-item">
-                            <div class="toggle-info">
-                                <span class="toggle-label">Bỏ qua trang đầu (Trang bìa)</span>
-                                <span class="toggle-sub">Không chèn Header vào trang đầu tiên</span>
+                        <div class="control-group">
+                            <div class="label-with-value">
+                                <label for="header-scale" class="control-label">Kích thước Header (Scale)</label>
+                                <span class="value-badge" id="scale-val">50%</span>
                             </div>
-                            <label class="switch">
-                                <input type="checkbox" id="skip-first">
-                                <span class="slider-round"></span>
-                            </label>
+                            <input type="range" id="header-scale" min="5" max="100" value="50" class="range-slider">
+                            <div class="slider-ticks"><span>Nhỏ (5%)</span><span>Trung bình</span><span>Lớn (100%)</span></div>
                         </div>
-                        <div class="toggle-item">
-                            <div class="toggle-info">
-                                <span class="toggle-label">Bỏ qua trang cuối</span>
-                                <span class="toggle-sub">Không chèn Header vào trang cuối cùng</span>
+                        <div class="control-group">
+                            <div class="label-with-value">
+                                <label for="header-margin" class="control-label">Khoảng cách lề trên (Top Margin)</label>
+                                <span class="value-badge" id="margin-val">20px</span>
                             </div>
-                            <label class="switch">
-                                <input type="checkbox" id="skip-last">
-                                <span class="slider-round"></span>
-                            </label>
+                            <input type="range" id="header-margin" min="0" max="150" value="20" class="range-slider">
+                            <div class="slider-ticks"><span>Sát mép (0px)</span><span>Xa (150px)</span></div>
                         </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Right Panel: Live Preview and Actions -->
-            <section class="preview-panel">
-                <div class="preview-card glass-panel">
-                    <h2 class="settings-title"><i data-lucide="eye"></i> Xem trước trang A4</h2>
-                    
-                    <!-- Real-time Visual Sheet Mockup -->
-                    <div class="a4-container">
-                        <div class="a4-sheet" id="a4-sheet">
-                            <!-- Visual Header placeholder in the sheet -->
-                            <div class="preview-header-container" id="preview-header-container">
-                                <div class="preview-header" id="preview-header">
-                                    <div class="placeholder-pattern"></div>
-                                    <img id="preview-header-img" src="" alt="" style="display: none;">
-                                    <span class="placeholder-text" id="preview-header-text">HEADER IMAGE</span>
+                        <div class="toggle-group">
+                            <div class="toggle-item">
+                                <div class="toggle-info">
+                                    <span class="toggle-label">Co nhỏ nội dung gốc</span>
+                                    <span class="toggle-sub">Co nhỏ trang để không bị Header đè lên chữ</span>
                                 </div>
+                                <label class="switch"><input type="checkbox" id="shrink-content" checked><span class="slider-round"></span></label>
                             </div>
-                            
-                            <!-- Mock content of the A4 page -->
-                            <div class="a4-mock-content">
-                                <div class="mock-line title"></div>
-                                <div class="mock-line"></div>
-                                <div class="mock-line"></div>
-                                <div class="mock-line short"></div>
-                                <div class="mock-line"></div>
-                                <div class="mock-line"></div>
-                                <div class="mock-line"></div>
-                                <div class="mock-line short"></div>
+                            <div class="toggle-item">
+                                <div class="toggle-info">
+                                    <span class="toggle-label">Bỏ qua trang đầu (Trang bìa)</span>
+                                    <span class="toggle-sub">Không chèn Header vào trang đầu tiên</span>
+                                </div>
+                                <label class="switch"><input type="checkbox" id="skip-first"><span class="slider-round"></span></label>
                             </div>
-                            
-                            <!-- Page number footer -->
-                            <div class="a4-mock-footer">
-                                <span>Trang 2 / 5</span>
+                            <div class="toggle-item">
+                                <div class="toggle-info">
+                                    <span class="toggle-label">Bỏ qua trang cuối</span>
+                                    <span class="toggle-sub">Không chèn Header vào trang cuối cùng</span>
+                                </div>
+                                <label class="switch"><input type="checkbox" id="skip-last"><span class="slider-round"></span></label>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Right Panel -->
+                <section class="preview-panel">
+                    <div class="preview-card glass-panel">
+                        <h2 class="settings-title"><i data-lucide="eye"></i> Xem trước trang A4</h2>
+                        <div class="a4-container">
+                            <div class="a4-sheet" id="a4-sheet">
+                                <div class="preview-header-container" id="preview-header-container">
+                                    <div class="preview-header" id="preview-header">
+                                        <div class="placeholder-pattern"></div>
+                                        <img id="preview-header-img" src="" alt="" style="display: none;">
+                                        <span class="placeholder-text" id="preview-header-text">HEADER IMAGE</span>
+                                    </div>
+                                </div>
+                                <div class="a4-mock-content">
+                                    <div class="mock-line title"></div>
+                                    <div class="mock-line"></div>
+                                    <div class="mock-line"></div>
+                                    <div class="mock-line short"></div>
+                                    <div class="mock-line"></div>
+                                    <div class="mock-line"></div>
+                                    <div class="mock-line"></div>
+                                    <div class="mock-line short"></div>
+                                </div>
+                                <div class="a4-mock-footer"><span>Trang 2 / 5</span></div>
+                            </div>
+                        </div>
+                        <div class="action-section">
+                            <button type="button" id="process-btn" class="process-btn" disabled>
+                                <i data-lucide="sparkles"></i>
+                                <span>Chèn Header &amp; Tải PDF</span>
+                            </button>
+                            <p class="processing-info" id="status-message">Vui lòng tải lên đầy đủ file PDF và ảnh PNG để bắt đầu.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- ======================================== -->
+        <!-- TAB 2: CV SUMMARY                        -->
+        <!-- ======================================== -->
+        <div class="tab-content" id="tab-cv-summary" role="tabpanel">
+            <div class="cv-main-layout">
+
+                <!-- Left Column: Upload + Extracted Text -->
+                <div class="cv-col-left">
+                    <div class="upload-grid">
+                        <div class="drop-zone" id="cv-pdf-drop-zone">
+                            <input type="file" id="cv-pdf-input" accept=".pdf" class="file-input">
+                            <div class="drop-zone-content">
+                                <div class="icon-wrapper pdf-icon"><i data-lucide="file-text"></i></div>
+                                <h3>Upload CV (PDF)</h3>
+                                <p class="drop-info">Kéo thả hoặc click để chọn CV PDF</p>
+                                <span class="file-name-display" id="cv-pdf-name">Chưa có file nào được chọn</span>
+                            </div>
+                        </div>
+                        <div class="drop-zone" id="cv-png-drop-zone">
+                            <input type="file" id="cv-png-input" accept=".png" class="file-input">
+                            <div class="drop-zone-content">
+                                <div class="icon-wrapper png-icon"><i data-lucide="image"></i></div>
+                                <h3>Header PNG</h3>
+                                <p class="drop-info">Kéo thả hoặc click để chọn ảnh Header</p>
+                                <span class="file-name-display" id="cv-png-name">Chưa có file nào được chọn</span>
+                            </div>
+                        </div>
+                    </div>
+                </div><!-- /cv-col-left -->
+
+                <!-- Right Column: Form + Preview + Action -->
+                <div class="cv-col-right">
+                    <div class="summary-form-panel glass-panel">
+                        <h2 class="settings-title"><i data-lucide="clipboard-list"></i> Candidate Summary</h2>
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label class="form-label" for="cv-name"><i data-lucide="user"></i> Name</label>
+                                <input type="text" id="cv-name" class="form-input" placeholder="Full name of candidate">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="cv-position"><i data-lucide="briefcase"></i> Position Applied</label>
+                                <input type="text" id="cv-position" class="form-input" placeholder="e.g. Senior Developer">
+                            </div>
+                            <div class="form-field form-field-full">
+                                <label class="form-label" for="cv-profile-summary"><i data-lucide="align-left"></i> Profile Summary</label>
+                                <textarea id="cv-profile-summary" class="form-textarea" rows="4" placeholder="Brief professional summary of the candidate..."></textarea>
+                            </div>
+                            <div class="form-field form-field-full">
+                                <label class="form-label" for="cv-skills"><i data-lucide="zap"></i> Top Skills</label>
+                                <textarea id="cv-skills" class="form-textarea" rows="3" placeholder="e.g. React, Node.js, Python, SQL, Agile..."></textarea>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="cv-english"><i data-lucide="globe"></i> English</label>
+                                <input type="text" id="cv-english" class="form-input" placeholder="e.g. Intermediate (B1)">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="cv-notice"><i data-lucide="calendar"></i> Notice Period</label>
+                                <input type="text" id="cv-notice" class="form-input" placeholder="e.g. 2 weeks / 1 month">
                             </div>
                         </div>
                     </div>
 
-                    <!-- CTA Actions -->
+                    <!-- Live Preview Table -->
+                    <div class="summary-preview-panel glass-panel">
+                        <h2 class="settings-title"><i data-lucide="table-2"></i> Summary Preview</h2>
+                        <div class="preview-table-wrapper">
+                            <table class="summary-preview-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="preview-label">Name</td>
+                                        <td class="preview-value" id="prev-name">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="preview-label">Position Applied</td>
+                                        <td class="preview-value" id="prev-position">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="preview-label">Profile Summary</td>
+                                        <td class="preview-value" id="prev-summary">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="preview-label">Top Skills</td>
+                                        <td class="preview-value" id="prev-skills">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="preview-label">English</td>
+                                        <td class="preview-value" id="prev-english">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="preview-label">Notice Period</td>
+                                        <td class="preview-value" id="prev-notice">—</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Action -->
                     <div class="action-section">
-                        <button type="button" id="process-btn" class="process-btn" disabled>
-                            <i data-lucide="sparkles"></i>
-                            <span>Chèn Header & Tải PDF</span>
+                        <button type="button" id="cv-generate-btn" class="process-btn cv-process-btn" disabled>
+                            <i data-lucide="file-output"></i>
+                            <span>Generate CV Report PDF</span>
                         </button>
-                        <p class="processing-info" id="status-message">Vui lòng tải lên đầy đủ file PDF và ảnh PNG để bắt đầu.</p>
+                        <p class="processing-info" id="cv-status-message">Upload CV PDF và Header PNG để bắt đầu.</p>
                     </div>
                 </div>
-            </section>
+            </div>
         </div>
     </main>
 
-    <!-- Progress / Loading Overlay -->
+    <!-- Loading Overlay -->
     <div class="overlay" id="loading-overlay">
         <div class="loader-card glass-panel">
             <div class="spinner"></div>
             <h3 id="loader-title">Đang xử lý tài liệu...</h3>
-            <p id="loader-subtitle">Đang nạp file PDF và chèn header...</p>
+            <p id="loader-subtitle">Đang nạp file PDF và xử lý...</p>
             <div class="progress-bar-container">
                 <div class="progress-bar" id="progress-bar"></div>
             </div>
         </div>
     </div>
 
-    <!-- Notification Toast -->
+    <!-- Toast -->
     <div class="toast" id="toast">
         <i data-lucide="info" id="toast-icon"></i>
-        <span id="toast-message">Đây là thông báo!</span>
+        <span id="toast-message">Thông báo</span>
     </div>
 
     <script src="app.js"></script>
