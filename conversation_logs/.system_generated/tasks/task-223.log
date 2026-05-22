@@ -1,0 +1,4 @@
+warning: in the working copy of 'package.json', LF will be replaced by CRLF the next time Git touches it
+[main 09c35fd] Add package.json for local development script
+ 1 file changed, 17 insertions(+)
+ create mode 100644 package.json

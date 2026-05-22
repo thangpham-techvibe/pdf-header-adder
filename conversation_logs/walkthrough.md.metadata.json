@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_WALKTHROUGH",
+  "summary": "Báo cáo tổng kết sửa lỗi đè thông tin PDF bằng chế độ co nhỏ nội dung gốc (Shrink Content) sử dụng API embedPages của pdf-lib.",
+  "updatedAt": "2026-05-21T11:56:18.721811900Z"
+}
