@@ -477,3 +477,235 @@ input:checked + .slider-round:before { transform: translateX(20px); }
 .summary-preview-table tr:nth-child(even) .preview-value { background: #ffffff; }
 .summary-preview-table tr:last-child .preview-label,
 .summary-preview-table tr:last-child .preview-value { border-bottom: none; }
+
+/* =====================================================
+   CV FILES MANAGER & LIST
+   ===================================================== */
+.cv-file-manager {
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.manager-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 0.75rem;
+}
+.manager-header h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.manager-icon {
+    color: #42B0D5;
+    width: 1.1rem;
+    height: 1.1rem;
+}
+#cv-count {
+    color: #42B0D5;
+}
+.cv-file-list {
+    max-height: 250px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-right: 0.25rem;
+}
+
+/* Custom Scrollbar for list */
+.cv-file-list::-webkit-scrollbar {
+    width: 6px;
+}
+.cv-file-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+.cv-file-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+.cv-file-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Empty Placeholder */
+.file-list-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text-muted);
+    border: 1px dashed rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.1);
+}
+.file-list-placeholder i.placeholder-icon {
+    width: 2.2rem;
+    height: 2.2rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+.file-list-placeholder p {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+.file-list-placeholder .sub-info {
+    font-size: 0.78rem;
+    margin-top: 0.25rem;
+    opacity: 0.7;
+}
+
+/* File List Item */
+.cv-file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.7rem 0.9rem;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    gap: 0.75rem;
+}
+.cv-file-item:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.02);
+}
+.cv-file-item.active {
+    border-color: #42B0D5;
+    background: rgba(66, 176, 213, 0.08);
+    box-shadow: 0 0 12px rgba(66, 176, 213, 0.12);
+}
+.cv-file-item-left {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0; /* allows text truncation */
+    flex-grow: 1;
+}
+.cv-file-item-left i {
+    width: 1.1rem;
+    height: 1.1rem;
+    color: #ef4444;
+    flex-shrink: 0;
+}
+.cv-file-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+.cv-file-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Status Badges */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.12rem 0.4rem;
+    border-radius: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.2px;
+    align-self: flex-start;
+}
+.status-badge.draft {
+    background: rgba(249, 115, 22, 0.1);
+    color: #f97316;
+    border: 1px solid rgba(249, 115, 22, 0.15);
+}
+.status-badge.ready {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.15);
+}
+.status-badge i {
+    width: 0.72rem;
+    height: 0.72rem;
+}
+
+/* Remove button */
+.cv-file-remove {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.3rem;
+    border-radius: 6px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.cv-file-remove:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.12);
+}
+.cv-file-remove i {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Batch Export Button */
+.cv-batch-btn {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18);
+}
+.cv-batch-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.28);
+}
+
+/* Disabled Form State styles */
+.form-input:disabled,
+.form-textarea:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: rgba(0, 0, 0, 0.15);
+    border-color: rgba(255, 255, 255, 0.03);
+}
+.form-disabled-info {
+    background: rgba(249, 115, 22, 0.08);
+    border: 1px solid rgba(249, 115, 22, 0.18);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    color: #f97316;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    animation: fadeIn 0.3s ease;
+}
+.form-disabled-info i {
+    flex-shrink: 0;
+    width: 1.1rem;
+    height: 1.1rem;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+

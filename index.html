@@ -170,11 +170,11 @@
                 <div class="cv-col-left">
                     <div class="upload-grid">
                         <div class="drop-zone" id="cv-pdf-drop-zone">
-                            <input type="file" id="cv-pdf-input" accept=".pdf" class="file-input">
+                            <input type="file" id="cv-pdf-input" accept=".pdf" class="file-input" multiple>
                             <div class="drop-zone-content">
                                 <div class="icon-wrapper pdf-icon"><i data-lucide="file-text"></i></div>
                                 <h3>Upload CV (PDF)</h3>
-                                <p class="drop-info">Kéo thả hoặc click để chọn CV PDF</p>
+                                <p class="drop-info">Kéo thả hoặc click chọn tối đa 10 file PDF</p>
                                 <span class="file-name-display" id="cv-pdf-name">Chưa có file nào được chọn</span>
                             </div>
                         </div>
@@ -187,6 +187,25 @@
                                 <span class="file-name-display" id="cv-png-name">Chưa có file nào được chọn</span>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- CV Files Manager -->
+                    <div class="cv-file-manager glass-panel">
+                        <div class="manager-header">
+                            <h3><i data-lucide="users" class="manager-icon"></i> Danh sách CV (<span id="cv-count">0</span>/10)</h3>
+                        </div>
+                        <div class="cv-file-list" id="cv-file-list">
+                            <!-- Placeholder -->
+                            <div class="file-list-placeholder">
+                                <i data-lucide="files" class="placeholder-icon"></i>
+                                <p>Chưa có file CV nào được chọn.</p>
+                                <span class="sub-info">Kéo thả file PDF vào ô phía trên để bắt đầu.</span>
+                            </div>
+                        </div>
+                        <button type="button" id="cv-export-all-btn" class="process-btn cv-batch-btn" disabled>
+                            <i data-lucide="download-cloud"></i>
+                            <span>Xuất tất cả CV sẵn sàng</span>
+                        </button>
                     </div>
                 </div><!-- /cv-col-left -->
 

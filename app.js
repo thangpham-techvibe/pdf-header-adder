@@ -9,8 +9,9 @@ const state = {
 };
 
 const cvState = {
-    pdfFile: null, pdfFileName: '',
-    pngFile: null, pngFileName: ''
+    pngFile: null, pngFileName: '',
+    files: [], // Array of objects: { id, file, name, status, form: { name, position, summary, skills, english, notice } }
+    activeFileId: null
 };
 
 // =====================================================
@@ -53,6 +54,7 @@ const cvPngInput          = document.getElementById('cv-png-input');
 const cvPngDropZone       = document.getElementById('cv-png-drop-zone');
 const cvPngNameDisplay    = document.getElementById('cv-png-name');
 const cvGenerateBtn       = document.getElementById('cv-generate-btn');
+const cvExportAllBtn      = document.getElementById('cv-export-all-btn');
 const cvStatusMessage     = document.getElementById('cv-status-message');
 
 // Initialize icons
@@ -295,55 +297,290 @@ processBtn.addEventListener('click', async () => {
 // TAB 2 – CV SUMMARY
 // =====================================================
 
-// Setup pdf.js worker
-if (typeof pdfjsLib !== 'undefined') {
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-}
+function handleCvPdfsSelected(files) {
+    if (!files || files.length === 0) return;
 
-function handleCvPdfSelected(file) {
-    cvState.pdfFile = file; cvState.pdfFileName = file.name;
-    cvPdfNameDisplay.textContent = file.name;
-    cvPdfDropZone.classList.add('has-file');
-    showToast('CV PDF loaded!', 'success');
+    let addedCount = 0;
+    let skippedCount = 0;
+
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (cvState.files.length >= 10) {
+            skippedCount += (files.length - i);
+            break;
+        }
+
+        const fileId = Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9);
+        cvState.files.push({
+            id: fileId,
+            file: file,
+            name: file.name,
+            status: 'draft',
+            form: {
+                name: '',
+                position: '',
+                summary: '',
+                skills: '',
+                english: '',
+                notice: ''
+            }
+        });
+        addedCount++;
+
+        if (!cvState.activeFileId) {
+            cvState.activeFileId = fileId;
+        }
+    }
+
+    if (addedCount > 0) {
+        showToast(`Đã thêm ${addedCount} file CV PDF!`, 'success');
+        cvPdfNameDisplay.textContent = `${cvState.files.length} file đã chọn`;
+        cvPdfDropZone.classList.add('has-file');
+    }
+
+    if (skippedCount > 0) {
+        showToast(`Vượt quá giới hạn! Bỏ qua ${skippedCount} file. Tối đa 10 file.`, 'error');
+    }
+
+    renderFileList();
+    syncFormWithActiveFile();
     checkCvReadyState();
 }
 
 function handleCvPngSelected(file) {
-    cvState.pngFile = file; cvState.pngFileName = file.name;
+    cvState.pngFile = file;
+    cvState.pngFileName = file.name;
     cvPngNameDisplay.textContent = file.name;
     cvPngDropZone.classList.add('has-file');
     showToast('Header PNG loaded!', 'success');
     checkCvReadyState();
 }
 
-setupDragAndDrop(cvPdfDropZone, cvPdfInput, 'pdf', handleCvPdfSelected);
+// Custom Drag and Drop for multi-PDFs
+cvPdfDropZone.addEventListener('click', (e) => { if (e.target !== cvPdfInput) cvPdfInput.click(); });
+cvPdfDropZone.addEventListener('dragover', (e) => { e.preventDefault(); cvPdfDropZone.classList.add('dragover'); });
+cvPdfDropZone.addEventListener('dragleave', () => cvPdfDropZone.classList.remove('dragover'));
+cvPdfDropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    cvPdfDropZone.classList.remove('dragover');
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const pdfFiles = Array.from(e.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+        if (pdfFiles.length > 0) {
+            handleCvPdfsSelected(pdfFiles);
+        } else {
+            showToast('Vui lòng chỉ chọn các file .pdf', 'error');
+        }
+    }
+});
+cvPdfInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+        const pdfFiles = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+        handleCvPdfsSelected(pdfFiles);
+    }
+});
+
+// Setup PNG header using shared drag and drop
 setupDragAndDrop(cvPngDropZone, cvPngInput, 'png', handleCvPngSelected);
 
-// Live preview binding
-const previewMap = [
-    ['cv-name',            'prev-name'],
-    ['cv-position',        'prev-position'],
-    ['cv-profile-summary', 'prev-summary'],
-    ['cv-skills',          'prev-skills'],
-    ['cv-english',         'prev-english'],
-    ['cv-notice',          'prev-notice'],
-];
-previewMap.forEach(([inputId, previewId]) => {
-    const inp = document.getElementById(inputId);
-    const prv = document.getElementById(previewId);
-    if (inp && prv) inp.addEventListener('input', () => { prv.textContent = inp.value || '—'; });
+const cvFormPanel = document.querySelector('.summary-form-panel');
+const cvFields = {
+    name:     document.getElementById('cv-name'),
+    position: document.getElementById('cv-position'),
+    summary:  document.getElementById('cv-profile-summary'),
+    skills:   document.getElementById('cv-skills'),
+    english:  document.getElementById('cv-english'),
+    notice:   document.getElementById('cv-notice'),
+};
+
+const prevFields = {
+    name:     document.getElementById('prev-name'),
+    position: document.getElementById('prev-position'),
+    summary:  document.getElementById('prev-summary'),
+    skills:   document.getElementById('prev-skills'),
+    english:  document.getElementById('prev-english'),
+    notice:   document.getElementById('prev-notice'),
+};
+
+function renderFileList() {
+    const listContainer = document.getElementById('cv-file-list');
+    const countSpan = document.getElementById('cv-count');
+    
+    listContainer.innerHTML = '';
+    countSpan.textContent = cvState.files.length;
+    
+    if (cvState.files.length === 0) {
+        cvPdfNameDisplay.textContent = 'Chưa có file nào được chọn';
+        cvPdfDropZone.classList.remove('has-file');
+        
+        listContainer.innerHTML = `
+            <div class="file-list-placeholder">
+                <i data-lucide="files" class="placeholder-icon"></i>
+                <p>Chưa có file CV nào được chọn.</p>
+                <span class="sub-info">Kéo thả file PDF vào ô phía trên để bắt đầu.</span>
+            </div>
+        `;
+        lucide.createIcons();
+        return;
+    }
+    
+    cvState.files.forEach(fileEntry => {
+        const item = document.createElement('div');
+        item.className = `cv-file-item ${fileEntry.id === cvState.activeFileId ? 'active' : ''}`;
+        
+        const badgeClass = fileEntry.status === 'ready' ? 'ready' : 'draft';
+        const badgeLabel = fileEntry.status === 'ready' ? 'Sẵn sàng' : 'Thiếu TT';
+        const badgeIcon = fileEntry.status === 'ready' ? 'check-circle' : 'circle-alert';
+        
+        item.innerHTML = `
+            <div class="cv-file-item-left">
+                <i data-lucide="file-text"></i>
+                <div class="cv-file-details">
+                    <span class="cv-file-name" title="${fileEntry.name}">${fileEntry.name}</span>
+                    <span class="status-badge ${badgeClass}">
+                        <i data-lucide="${badgeIcon}"></i>
+                        <span>${badgeLabel}</span>
+                    </span>
+                </div>
+            </div>
+            <button type="button" class="cv-file-remove" title="Xóa file">
+                <i data-lucide="trash-2"></i>
+            </button>
+        `;
+        
+        item.addEventListener('click', (e) => {
+            if (e.target.closest('.cv-file-remove')) {
+                removeCvFile(fileEntry.id);
+            } else {
+                selectCvFile(fileEntry.id);
+            }
+        });
+        
+        listContainer.appendChild(item);
+    });
+    
+    lucide.createIcons();
+}
+
+function selectCvFile(id) {
+    cvState.activeFileId = id;
+    renderFileList();
+    syncFormWithActiveFile();
+    checkCvReadyState();
+}
+
+function removeCvFile(id) {
+    const index = cvState.files.findIndex(f => f.id === id);
+    if (index === -1) return;
+    
+    cvState.files.splice(index, 1);
+    
+    if (cvState.activeFileId === id) {
+        if (cvState.files.length > 0) {
+            cvState.activeFileId = cvState.files[Math.max(0, index - 1)].id;
+        } else {
+            cvState.activeFileId = null;
+        }
+    }
+    
+    if (cvState.files.length > 0) {
+        cvPdfNameDisplay.textContent = `${cvState.files.length} file đã chọn`;
+    } else {
+        cvPdfNameDisplay.textContent = 'Chưa có file nào được chọn';
+    }
+    
+    renderFileList();
+    syncFormWithActiveFile();
+    checkCvReadyState();
+    showToast('Đã xóa file khỏi danh sách', 'info');
+}
+
+function syncFormWithActiveFile() {
+    const activeFile = cvState.files.find(f => f.id === cvState.activeFileId);
+    
+    const existingMsg = cvFormPanel.querySelector('.form-disabled-info');
+    if (existingMsg) existingMsg.remove();
+    
+    if (!activeFile) {
+        Object.values(cvFields).forEach(field => {
+            field.disabled = true;
+            field.value = '';
+        });
+        
+        Object.values(prevFields).forEach(field => {
+            field.textContent = '—';
+        });
+        
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'form-disabled-info';
+        msgDiv.innerHTML = `<i data-lucide="circle-alert"></i> Vui lòng tải lên hoặc chọn một file CV từ danh sách để bắt đầu nhập thông tin.`;
+        cvFormPanel.insertBefore(msgDiv, cvFormPanel.querySelector('.form-grid'));
+        lucide.createIcons();
+        return;
+    }
+    
+    Object.keys(cvFields).forEach(key => {
+        cvFields[key].disabled = false;
+        cvFields[key].value = activeFile.form[key] || '';
+    });
+    
+    Object.keys(prevFields).forEach(key => {
+        prevFields[key].textContent = activeFile.form[key] || '—';
+    });
+}
+
+// Live preview and state binding
+Object.keys(cvFields).forEach(key => {
+    const inp = cvFields[key];
+    if (inp) {
+        inp.addEventListener('input', () => {
+            const activeFile = cvState.files.find(f => f.id === cvState.activeFileId);
+            if (activeFile) {
+                activeFile.form[key] = inp.value;
+                
+                const prv = prevFields[key];
+                if (prv) prv.textContent = inp.value || '—';
+                
+                const allFilled = Object.values(activeFile.form).every(val => val && val.trim() !== '');
+                const oldStatus = activeFile.status;
+                activeFile.status = allFilled ? 'ready' : 'draft';
+                
+                if (oldStatus !== activeFile.status) {
+                    renderFileList();
+                }
+                
+                checkCvReadyState();
+            }
+        });
+    }
 });
 
 function checkCvReadyState() {
-    if (cvState.pdfFile && cvState.pngFile) {
+    const activeFile = cvState.files.find(f => f.id === cvState.activeFileId);
+    const hasPng = !!cvState.pngFile;
+    
+    if (activeFile && hasPng && activeFile.status === 'ready') {
         cvGenerateBtn.removeAttribute('disabled');
-        cvStatusMessage.textContent = 'Ready. Fill in the summary and click Generate.';
+        cvStatusMessage.textContent = `CV "${activeFile.name}" đã sẵn sàng để xuất!`;
         cvStatusMessage.style.color = 'var(--success-color)';
     } else {
         cvGenerateBtn.setAttribute('disabled', 'true');
-        cvStatusMessage.textContent = 'Upload CV PDF và Header PNG để bắt đầu.';
-        cvStatusMessage.style.color = 'var(--text-secondary)';
+        if (!hasPng) {
+            cvStatusMessage.textContent = 'Vui lòng tải lên ảnh Header PNG.';
+            cvStatusMessage.style.color = 'var(--text-secondary)';
+        } else if (!activeFile) {
+            cvStatusMessage.textContent = 'Vui lòng tải lên ít nhất một file CV PDF.';
+            cvStatusMessage.style.color = 'var(--text-secondary)';
+        } else {
+            cvStatusMessage.textContent = 'Vui lòng điền đầy đủ cả 6 trường thông tin ứng viên để xuất PDF.';
+            cvStatusMessage.style.color = 'var(--text-secondary)';
+        }
+    }
+    
+    const anyReady = cvState.files.some(f => f.status === 'ready');
+    if (anyReady && hasPng) {
+        cvExportAllBtn.removeAttribute('disabled');
+    } else {
+        cvExportAllBtn.setAttribute('disabled', 'true');
     }
 }
 
@@ -366,195 +603,178 @@ function wrapText(text, maxWidth, font, size) {
     return lines.length ? lines : ['—'];
 }
 
-// =====================================================
-// GENERATE CV REPORT PDF
-// =====================================================
-cvGenerateBtn.addEventListener('click', async () => {
-    if (!cvState.pdfFile || !cvState.pngFile) return;
+async function generateReportBytes(fileEntry) {
+    const pdfBytes = await readFileAsArrayBuffer(fileEntry.file);
+    const pngBytes = await readFileAsArrayBuffer(cvState.pngFile);
 
-    const form = {
-        name:     document.getElementById('cv-name').value,
-        position: document.getElementById('cv-position').value,
-        summary:  document.getElementById('cv-profile-summary').value,
-        skills:   document.getElementById('cv-skills').value,
-        english:  document.getElementById('cv-english').value,
-        notice:   document.getElementById('cv-notice').value,
+    const { PDFDocument, StandardFonts, rgb } = PDFLib;
+    const outDoc  = await PDFDocument.create();
+    const boldFont= await outDoc.embedFont(StandardFonts.HelveticaBold);
+    const regFont = await outDoc.embedFont(StandardFonts.Helvetica);
+
+    let pngImage;
+    try { pngImage = await outDoc.embedPng(pngBytes); } catch { throw new Error('Ảnh Header PNG không hợp lệ.'); }
+    const pngDims = pngImage.scale(1);
+
+    const A4W = 595.28, A4H = 841.89;
+    const hdrH = (pngDims.height / pngDims.width) * A4W;
+
+    const C = {
+        white:    rgb(1,      1,      1     ),
+        accent:   rgb(0.259,  0.690,  0.835 ),
+        accentDk: rgb(0.18,   0.50,   0.64  ),
+        darkText: rgb(0.12,   0.15,   0.22  ),
+        grayText: rgb(0.50,   0.55,   0.65  ),
+        row1:     rgb(0.95,   0.96,   0.98  ),
+        row2:     rgb(0.98,   0.99,   1.00  ),
+        border:   rgb(0.80,   0.84,   0.90  ),
     };
+
+    const sumPage = outDoc.addPage([A4W, A4H]);
+    sumPage.drawRectangle({ x: 0, y: 0, width: A4W, height: A4H, color: C.white });
+    sumPage.drawImage(pngImage, { x: 0, y: A4H - hdrH, width: A4W, height: hdrH });
+
+    // Title: CANDIDATE SUMMARY
+    const blueText = rgb(0.106, 0.459, 0.733); // #1b75bb
+    const stTitleY = A4H - hdrH - 45;
+    const stTitle  = 'CANDIDATE SUMMARY', stSz = 16;
+    const stW = boldFont.widthOfTextAtSize(stTitle, stSz);
+    sumPage.drawText(stTitle, { x: (A4W - stW) / 2, y: stTitleY, font: boldFont, size: stSz, color: blueText });
+
+    // Blue underline spanning table width
+    const tblX = 40, tblW = A4W - 80, col1W = 148, col2W = tblW - col1W;
+    sumPage.drawLine({ start: { x: tblX, y: stTitleY - 12 }, end: { x: tblX + tblW, y: stTitleY - 12 }, thickness: 1.5, color: blueText });
+
+    // Table settings (directly below underline)
+    const cellPad = 9, lineH = 13, minRowH = 34;
+    const tblStartY = stTitleY - 32;
+    let curY = tblStartY;
+
+    const rows = [
+        ['Name',            fileEntry.form.name],
+        ['Position Applied',fileEntry.form.position],
+        ['Profile Summary', fileEntry.form.summary],
+        ['Top Skills',      fileEntry.form.skills],
+        ['English',         fileEntry.form.english],
+        ['Notice Period',   fileEntry.form.notice],
+    ];
+
+    rows.forEach(([label, value], idx) => {
+        const lines  = wrapText(value, col2W - cellPad * 2, regFont, 10);
+        const rowH   = Math.max(minRowH, lines.length * lineH + cellPad * 2);
+        const rowY   = curY - rowH;
+        // Alternating zebra striping: Row 1, 3, 5 are light blue/grey, Row 2, 4, 6 are white
+        const bgFill = idx % 2 === 0 ? C.row1 : C.white;
+
+        // Draw backgrounds for cells
+        sumPage.drawRectangle({ x: tblX, y: rowY, width: col1W, height: rowH, color: C.accent }); // Label cell (Accent: #42b0d5)
+        sumPage.drawRectangle({ x: tblX + col1W, y: rowY, width: col2W, height: rowH, color: bgFill }); // Value cell (White / Light blue-grey)
+
+        // Row separator (bottom line of current row)
+        sumPage.drawLine({ start: { x: tblX, y: rowY }, end: { x: tblX + tblW, y: rowY }, thickness: 0.6, color: C.border });
+
+        // Label text — bold & white (vertically centered)
+        const lblSz = 10;
+        sumPage.drawText(label, {
+            x: tblX + cellPad,
+            y: rowY + rowH / 2 - lblSz / 2,
+            font: boldFont, size: lblSz, color: C.white,
+        });
+
+        // Value text — dark text & regular font (always)
+        lines.forEach((ln, li) => {
+            if (ln.trim()) {
+                sumPage.drawText(ln, {
+                    x: tblX + col1W + cellPad,
+                    y: rowY + rowH - cellPad - 10 - li * lineH,
+                    font: regFont, size: 10, color: C.darkText,
+                });
+            }
+        });
+        curY -= rowH;
+    });
+
+    // Table borders (Top line + outer borders + column divider using C.border)
+    sumPage.drawLine({ start: { x: tblX, y: tblStartY }, end: { x: tblX + tblW, y: tblStartY }, thickness: 0.6, color: C.border }); // Top line
+    sumPage.drawLine({ start: { x: tblX, y: tblStartY }, end: { x: tblX, y: curY }, thickness: 0.6, color: C.border }); // Left outer border
+    sumPage.drawLine({ start: { x: tblX + tblW, y: tblStartY }, end: { x: tblX + tblW, y: curY }, thickness: 0.6, color: C.border }); // Right outer border
+    sumPage.drawLine({ start: { x: tblX + col1W, y: tblStartY }, end: { x: tblX + col1W, y: curY }, thickness: 0.6, color: C.border }); // Column divider
+
+    // ── DRAW FOOTER GRADIENT (Page 1 Only) ──────────
+    const N = 100;
+    const stripW = A4W / N;
+    for (let j = 0; j < N; j++) {
+        const t = j / N;
+        // Interpolate from light blue (#42B0D5) to dark blue (#1c4587)
+        const r = 0.259 * (1 - t) + 0.110 * t;
+        const g = 0.690 * (1 - t) + 0.271 * t;
+        const b = 0.835 * (1 - t) + 0.529 * t;
+        sumPage.drawRectangle({
+            x: j * stripW,
+            y: 0,
+            width: stripW + 0.5,
+            height: 25,
+            color: rgb(r, g, b)
+        });
+    }
+
+    // Center footer text
+    const footerText = '© www.teamtechvibe.com';
+    const ftSz = 9;
+    const ftW = regFont.widthOfTextAtSize(footerText, ftSz);
+    sumPage.drawText(footerText, {
+        x: (A4W - ftW) / 2,
+        y: 12.5 - ftSz / 2,
+        font: regFont,
+        size: ftSz,
+        color: C.white
+    });
+
+    // ── PAGES 2+: ORIGINAL CV WITH HEADER ─────────
+    const origDoc   = await PDFDocument.load(pdfBytes);
+    const origPages = origDoc.getPages();
+    const total     = origPages.length;
+    const embedded  = await outDoc.embedPdf(origDoc, Array.from({ length: total }, (_, i) => i));
+
+    for (let i = 0; i < total; i++) {
+        const op  = origPages[i];
+        const cb  = op.getCropBox();
+        const [cX, cY, cW, cH] = [cb.x, cb.y, cb.width, cb.height];
+
+        const newPage = outDoc.addPage([op.getWidth(), op.getHeight()]);
+        newPage.setCropBox(cX, cY, cW, cH);
+
+        const phH    = (pngDims.height / pngDims.width) * cW;
+        const sf     = Math.max(0.5, (cH - phH - 12) / cH);
+        const dW     = op.getWidth()  * sf;
+        const dH     = op.getHeight() * sf;
+        const dX     = cX + (cW - cW * sf) / 2 - cX * sf;
+        const dY     = cY - cY * sf;
+
+        newPage.drawPage(embedded[i], { x: dX, y: dY, width: dW, height: dH });
+        newPage.drawImage(pngImage, { x: cX, y: cY + cH - phH, width: cW, height: phH });
+    }
+
+    const outBytes = await outDoc.save();
+    return outBytes;
+}
+
+cvGenerateBtn.addEventListener('click', async () => {
+    const activeFile = cvState.files.find(f => f.id === cvState.activeFileId);
+    if (!activeFile || !cvState.pngFile || activeFile.status !== 'ready') return;
 
     try {
         loadingOverlay.classList.add('active');
         loaderTitle.textContent = 'Generating CV Report...';
-        updateProgress(5, 'Reading files...');
+        updateProgress(20, 'Reading files & processing PDF...');
 
-        const pdfBytes = await readFileAsArrayBuffer(cvState.pdfFile);
-        const pngBytes = await readFileAsArrayBuffer(cvState.pngFile);
-        updateProgress(15, 'Creating document...');
-
-        const { PDFDocument, StandardFonts, rgb } = PDFLib;
-        const outDoc  = await PDFDocument.create();
-        const boldFont= await outDoc.embedFont(StandardFonts.HelveticaBold);
-        const regFont = await outDoc.embedFont(StandardFonts.Helvetica);
-
-        let pngImage;
-        try { pngImage = await outDoc.embedPng(pngBytes); } catch { throw new Error('Invalid PNG file.'); }
-        const pngDims = pngImage.scale(1);
-
-        const A4W = 595.28, A4H = 841.89;
-        const hdrH = (pngDims.height / pngDims.width) * A4W; // header height at A4 width
-
-        // Color palette — #42B0D5 accent
-        const C = {
-            white:    rgb(1,      1,      1     ),
-            accent:   rgb(0.259,  0.690,  0.835 ), // #42B0D5
-            accentDk: rgb(0.18,   0.50,   0.64  ), // darker shade
-            darkText: rgb(0.12,   0.15,   0.22  ),
-            grayText: rgb(0.50,   0.55,   0.65  ),
-            row1:     rgb(0.95,   0.96,   0.98  ),
-            row2:     rgb(0.98,   0.99,   1.00  ),
-            border:   rgb(0.80,   0.84,   0.90  ),
-        };
-
-        updateProgress(30, 'Drawing summary table...');
-
-        // ── SUMMARY TABLE PAGE ──────────────────────────
-        const sumPage = outDoc.addPage([A4W, A4H]);
-        sumPage.drawRectangle({ x: 0, y: 0, width: A4W, height: A4H, color: C.white });
-        sumPage.drawImage(pngImage, { x: 0, y: A4H - hdrH, width: A4W, height: hdrH });
-
-        // Title: CANDIDATE SUMMARY
-        const blueText = rgb(0.106, 0.459, 0.733); // #1b75bb
-        const stTitleY = A4H - hdrH - 45;
-        const stTitle  = 'CANDIDATE SUMMARY', stSz = 16;
-        const stW = boldFont.widthOfTextAtSize(stTitle, stSz);
-        sumPage.drawText(stTitle, { x: (A4W - stW) / 2, y: stTitleY, font: boldFont, size: stSz, color: blueText });
-
-        // Blue underline spanning table width
-        const tblX = 40, tblW = A4W - 80, col1W = 148, col2W = tblW - col1W;
-        sumPage.drawLine({ start: { x: tblX, y: stTitleY - 12 }, end: { x: tblX + tblW, y: stTitleY - 12 }, thickness: 1.5, color: blueText });
-
-        // Table settings (directly below underline)
-        const cellPad = 9, lineH = 13, minRowH = 34;
-        const tblStartY = stTitleY - 32;
-        let curY = tblStartY;
-
-        const rows = [
-            ['Name',            form.name],
-            ['Position Applied',form.position],
-            ['Profile Summary', form.summary],
-            ['Top Skills',      form.skills],
-            ['English',         form.english],
-            ['Notice Period',   form.notice],
-        ];
-
-        rows.forEach(([label, value], idx) => {
-            const lines  = wrapText(value, col2W - cellPad * 2, regFont, 10);
-            const rowH   = Math.max(minRowH, lines.length * lineH + cellPad * 2);
-            const rowY   = curY - rowH;
-            // Alternating zebra striping: Row 1, 3, 5 are light blue/grey, Row 2, 4, 6 are white
-            const bgFill = idx % 2 === 0 ? C.row1 : C.white;
-
-            // Draw backgrounds for cells
-            sumPage.drawRectangle({ x: tblX, y: rowY, width: col1W, height: rowH, color: C.accent }); // Label cell (Accent: #42b0d5)
-            sumPage.drawRectangle({ x: tblX + col1W, y: rowY, width: col2W, height: rowH, color: bgFill }); // Value cell (White / Light blue-grey)
-
-            // Row separator (bottom line of current row)
-            sumPage.drawLine({ start: { x: tblX, y: rowY }, end: { x: tblX + tblW, y: rowY }, thickness: 0.6, color: C.border });
-
-            // Label text — bold & white (vertically centered)
-            const lblSz = 10;
-            sumPage.drawText(label, {
-                x: tblX + cellPad,
-                y: rowY + rowH / 2 - lblSz / 2,
-                font: boldFont, size: lblSz, color: C.white,
-            });
-
-            // Value text — dark text & regular font (always)
-            lines.forEach((ln, li) => {
-                if (ln.trim()) {
-                    sumPage.drawText(ln, {
-                        x: tblX + col1W + cellPad,
-                        y: rowY + rowH - cellPad - 10 - li * lineH,
-                        font: regFont, size: 10, color: C.darkText,
-                    });
-                }
-            });
-            curY -= rowH;
-        });
-
-        // Table borders (Top line + outer borders + column divider using C.border)
-        sumPage.drawLine({ start: { x: tblX, y: tblStartY }, end: { x: tblX + tblW, y: tblStartY }, thickness: 0.6, color: C.border }); // Top line
-        sumPage.drawLine({ start: { x: tblX, y: tblStartY }, end: { x: tblX, y: curY }, thickness: 0.6, color: C.border }); // Left outer border
-        sumPage.drawLine({ start: { x: tblX + tblW, y: tblStartY }, end: { x: tblX + tblW, y: curY }, thickness: 0.6, color: C.border }); // Right outer border
-        sumPage.drawLine({ start: { x: tblX + col1W, y: tblStartY }, end: { x: tblX + col1W, y: curY }, thickness: 0.6, color: C.border }); // Column divider
-
-        // ── DRAW FOOTER GRADIENT (Page 1 Only) ──────────
-        const N = 100;
-        const stripW = A4W / N;
-        for (let j = 0; j < N; j++) {
-            const t = j / N;
-            // Interpolate from light blue (#42B0D5) to dark blue (#1c4587)
-            const r = 0.259 * (1 - t) + 0.110 * t;
-            const g = 0.690 * (1 - t) + 0.271 * t;
-            const b = 0.835 * (1 - t) + 0.529 * t;
-            sumPage.drawRectangle({
-                x: j * stripW,
-                y: 0,
-                width: stripW + 0.5,
-                height: 25,
-                color: rgb(r, g, b)
-            });
-        }
-
-        // Center footer text
-        const footerText = '© www.teamtechvibe.com';
-        const ftSz = 9;
-        const ftW = regFont.widthOfTextAtSize(footerText, ftSz);
-        sumPage.drawText(footerText, {
-            x: (A4W - ftW) / 2,
-            y: 12.5 - ftSz / 2,
-            font: regFont,
-            size: ftSz,
-            color: C.white
-        });
-
-        updateProgress(60, 'Embedding CV pages...');
-
-        // ── PAGES 3+: ORIGINAL CV WITH HEADER ─────────
-        const origDoc   = await PDFDocument.load(pdfBytes);
-        const origPages = origDoc.getPages();
-        const total     = origPages.length;
-        const embedded  = await outDoc.embedPdf(origDoc, Array.from({ length: total }, (_, i) => i));
-
-        for (let i = 0; i < total; i++) {
-            const op  = origPages[i];
-            const cb  = op.getCropBox();
-            const [cX, cY, cW, cH] = [cb.x, cb.y, cb.width, cb.height];
-
-            const newPage = outDoc.addPage([op.getWidth(), op.getHeight()]);
-            newPage.setCropBox(cX, cY, cW, cH);
-
-            // Header height scaled to this page's crop width
-            const phH    = (pngDims.height / pngDims.width) * cW;
-            const sf     = Math.max(0.5, (cH - phH - 12) / cH);
-            const dW     = op.getWidth()  * sf;
-            const dH     = op.getHeight() * sf;
-            const dX     = cX + (cW - cW * sf) / 2 - cX * sf;
-            const dY     = cY - cY * sf;
-
-            newPage.drawPage(embedded[i], { x: dX, y: dY, width: dW, height: dH });
-            newPage.drawImage(pngImage, { x: cX, y: cY + cH - phH, width: cW, height: phH });
-
-            updateProgress(60 + Math.floor((i + 1) / total * 30), `CV page ${i + 1}/${total}...`);
-        }
-
-        updateProgress(93, 'Saving report...');
-        const outBytes = await outDoc.save();
-        updateProgress(98, 'Downloading...');
-
+        const outBytes = await generateReportBytes(activeFile);
+        
+        updateProgress(90, 'Downloading...');
         const blob = new Blob([outBytes], { type: 'application/pdf' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `${cvState.pdfFileName.replace(/\.pdf$/i, '')}_CV_Report.pdf`;
+        link.download = `${activeFile.name.replace(/\.pdf$/i, '')}_CV_Report.pdf`;
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
 
         setTimeout(() => {
@@ -570,3 +790,45 @@ cvGenerateBtn.addEventListener('click', async () => {
         showToast(err.message || 'An error occurred!', 'error');
     }
 });
+
+cvExportAllBtn.addEventListener('click', async () => {
+    const readyFiles = cvState.files.filter(f => f.status === 'ready');
+    if (readyFiles.length === 0 || !cvState.pngFile) return;
+
+    try {
+        loadingOverlay.classList.add('active');
+        loaderTitle.textContent = 'Xuất hàng loạt CV...';
+        
+        for (let i = 0; i < readyFiles.length; i++) {
+            const fileEntry = readyFiles[i];
+            const pct = Math.floor((i / readyFiles.length) * 100);
+            updateProgress(pct, `Đang xử lý (${i + 1}/${readyFiles.length}): ${fileEntry.name}...`);
+            
+            const outBytes = await generateReportBytes(fileEntry);
+            
+            const blob = new Blob([outBytes], { type: 'application/pdf' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `${fileEntry.name.replace(/\.pdf$/i, '')}_CV_Report.pdf`;
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            
+            await new Promise(r => setTimeout(r, 600));
+        }
+
+        updateProgress(100, 'Hoàn thành!');
+        setTimeout(() => {
+            loadingOverlay.classList.remove('active');
+            loaderTitle.textContent = 'Đang xử lý tài liệu...';
+            showToast(`Đã xuất thành công ${readyFiles.length} file CV PDF!`, 'success');
+        }, 800);
+
+    } catch (err) {
+        console.error(err);
+        loadingOverlay.classList.remove('active');
+        loaderTitle.textContent = 'Đang xử lý tài liệu...';
+        showToast(err.message || 'Có lỗi xảy ra khi xuất hàng loạt!', 'error');
+    }
+});
+
+// Initialize form state
+syncFormWithActiveFile();
