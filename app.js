@@ -1,4 +1,32 @@
 // =====================================================
+// GLOBAL ERROR HANDLER & DIAGNOSTICS
+// =====================================================
+window.onerror = function(message, source, lineno, colno, error) {
+    const msg = `Lỗi JS: ${message} tại dòng ${lineno}:${colno}`;
+    console.error(msg, error);
+    if (typeof showToast === 'function') {
+        showToast(msg, 'error');
+    } else {
+        alert(msg);
+    }
+    return false;
+};
+
+window.onunhandledrejection = function(event) {
+    const msg = `Lỗi Promise: ${event.reason}`;
+    console.error(msg, event.reason);
+    if (typeof showToast === 'function') {
+        showToast(msg, 'error');
+    } else {
+        alert(msg);
+    }
+};
+
+console.log("PDF Smart Tools Initializing...");
+console.log("JSZip loaded:", typeof JSZip !== 'undefined');
+console.log("PDFLib loaded:", typeof PDFLib !== 'undefined');
+
+// =====================================================
 // SHARED STATE
 // =====================================================
 const state = {
@@ -603,9 +631,8 @@ function wrapText(text, maxWidth, font, size) {
     return lines.length ? lines : ['—'];
 }
 
-async function generateReportBytes(fileEntry) {
+async function generateReportBytes(fileEntry, pngBytes) {
     const pdfBytes = await readFileAsArrayBuffer(fileEntry.file);
-    const pngBytes = await readFileAsArrayBuffer(cvState.pngFile);
 
     const { PDFDocument, StandardFonts, rgb } = PDFLib;
     const outDoc  = await PDFDocument.create();
@@ -768,7 +795,8 @@ cvGenerateBtn.addEventListener('click', async () => {
         loaderTitle.textContent = 'Generating CV Report...';
         updateProgress(20, 'Reading files & processing PDF...');
 
-        const outBytes = await generateReportBytes(activeFile);
+        const pngBytes = await readFileAsArrayBuffer(cvState.pngFile);
+        const outBytes = await generateReportBytes(activeFile, pngBytes);
         
         updateProgress(90, 'Downloading...');
         const blob = new Blob([outBytes], { type: 'application/pdf' });
@@ -795,21 +823,29 @@ cvExportAllBtn.addEventListener('click', async () => {
     const readyFiles = cvState.files.filter(f => f.status === 'ready');
     if (readyFiles.length === 0 || !cvState.pngFile) return;
 
+    if (typeof JSZip === 'undefined') {
+        showToast('Không tìm thấy thư viện JSZip! Vui lòng tải lại trang.', 'error');
+        return;
+    }
+
     try {
         loadingOverlay.classList.add('active');
         loaderTitle.textContent = 'Xuất hàng loạt CV...';
         updateProgress(5, 'Khởi tạo...');
 
         const zip = new JSZip();
+        const pngBytes = await readFileAsArrayBuffer(cvState.pngFile);
         
         for (let i = 0; i < readyFiles.length; i++) {
             const fileEntry = readyFiles[i];
             const pct = 5 + Math.floor((i / readyFiles.length) * 85);
             updateProgress(pct, `Đang xử lý (${i + 1}/${readyFiles.length}): ${fileEntry.name}...`);
             
-            const outBytes = await generateReportBytes(fileEntry);
+            const outBytes = await generateReportBytes(fileEntry, pngBytes);
             
-            const fileName = `${fileEntry.name.replace(/\.pdf$/i, '')}_CV_Report.pdf`;
+            // Sanitize filename to avoid invalid characters in zip
+            const sanitizedName = fileEntry.name.replace(/[\\/:*?"<>|]/g, '_').replace(/\.pdf$/i, '');
+            const fileName = `${sanitizedName}_CV_Report.pdf`;
             zip.file(fileName, outBytes);
         }
 
