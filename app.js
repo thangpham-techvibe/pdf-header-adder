@@ -429,6 +429,13 @@ const prevFields = {
     notice:   document.getElementById('prev-notice'),
 };
 
+function recalculateStatus(fileEntry) {
+    if (!fileEntry || !fileEntry.form) return 'draft';
+    const allFilled = Object.values(fileEntry.form).every(val => val && val.trim() !== '');
+    fileEntry.status = allFilled ? 'ready' : 'draft';
+    return fileEntry.status;
+}
+
 function renderFileList() {
     const listContainer = document.getElementById('cv-file-list');
     const countSpan = document.getElementById('cv-count');
@@ -452,6 +459,7 @@ function renderFileList() {
     }
     
     cvState.files.forEach(fileEntry => {
+        recalculateStatus(fileEntry); // Recalculate status dynamically before rendering
         const item = document.createElement('div');
         item.className = `cv-file-item ${fileEntry.id === cvState.activeFileId ? 'active' : ''}`;
         
@@ -560,7 +568,7 @@ function syncFormWithActiveFile() {
 Object.keys(cvFields).forEach(key => {
     const inp = cvFields[key];
     if (inp) {
-        inp.addEventListener('input', () => {
+        const handler = () => {
             const activeFile = cvState.files.find(f => f.id === cvState.activeFileId);
             if (activeFile) {
                 activeFile.form[key] = inp.value;
@@ -568,9 +576,8 @@ Object.keys(cvFields).forEach(key => {
                 const prv = prevFields[key];
                 if (prv) prv.textContent = inp.value || '—';
                 
-                const allFilled = Object.values(activeFile.form).every(val => val && val.trim() !== '');
                 const oldStatus = activeFile.status;
-                activeFile.status = allFilled ? 'ready' : 'draft';
+                recalculateStatus(activeFile);
                 
                 if (oldStatus !== activeFile.status) {
                     renderFileList();
@@ -578,7 +585,9 @@ Object.keys(cvFields).forEach(key => {
                 
                 checkCvReadyState();
             }
-        });
+        };
+        inp.addEventListener('input', handler);
+        inp.addEventListener('change', handler);
     }
 });
 
@@ -820,6 +829,9 @@ cvGenerateBtn.addEventListener('click', async () => {
 });
 
 cvExportAllBtn.addEventListener('click', async () => {
+    // Recalculate status for all files to be absolutely sure
+    cvState.files.forEach(recalculateStatus);
+
     const readyFiles = cvState.files.filter(f => f.status === 'ready');
     if (readyFiles.length === 0 || !cvState.pngFile) return;
 
@@ -836,6 +848,9 @@ cvExportAllBtn.addEventListener('click', async () => {
         const zip = new JSZip();
         const pngBytes = await readFileAsArrayBuffer(cvState.pngFile);
         
+        // Track filenames in the zip to prevent duplicate names from overwriting each other
+        const usedFilenames = new Set();
+        
         for (let i = 0; i < readyFiles.length; i++) {
             const fileEntry = readyFiles[i];
             const pct = 5 + Math.floor((i / readyFiles.length) * 85);
@@ -845,7 +860,16 @@ cvExportAllBtn.addEventListener('click', async () => {
             
             // Sanitize filename to avoid invalid characters in zip
             const sanitizedName = fileEntry.name.replace(/[\\/:*?"<>|]/g, '_').replace(/\.pdf$/i, '');
-            const fileName = `${sanitizedName}_CV_Report.pdf`;
+            let fileName = `${sanitizedName}_CV_Report.pdf`;
+            let counter = 1;
+            
+            // If the filename already exists in the ZIP, append a counter suffix (case-insensitive check)
+            while (usedFilenames.has(fileName.toLowerCase())) {
+                fileName = `${sanitizedName}_CV_Report_${counter}.pdf`;
+                counter++;
+            }
+            usedFilenames.add(fileName.toLowerCase());
+            
             zip.file(fileName, outBytes);
         }
 
