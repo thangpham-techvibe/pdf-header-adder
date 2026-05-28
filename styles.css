@@ -85,7 +85,7 @@ body {
     gap: 0.35rem;
 }
 .brand-logo {
-    height: 44px;
+    height: 62px;
     object-fit: contain;
     filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.15));
     transition: transform 0.3s ease;
@@ -94,12 +94,12 @@ body {
     transform: scale(1.05);
 }
 .developer-name {
-    font-size: 0.72rem;
+    font-size: 0.64rem;
     color: var(--text-muted);
     font-weight: 600;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.6px;
     text-transform: uppercase;
-    opacity: 0.75;
+    opacity: 0.70;
 }
 .header-title {
     text-align: right;

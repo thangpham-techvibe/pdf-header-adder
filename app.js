@@ -798,35 +798,41 @@ cvExportAllBtn.addEventListener('click', async () => {
     try {
         loadingOverlay.classList.add('active');
         loaderTitle.textContent = 'Xuất hàng loạt CV...';
+        updateProgress(5, 'Khởi tạo...');
+
+        const zip = new JSZip();
         
         for (let i = 0; i < readyFiles.length; i++) {
             const fileEntry = readyFiles[i];
-            const pct = Math.floor((i / readyFiles.length) * 100);
+            const pct = 5 + Math.floor((i / readyFiles.length) * 85);
             updateProgress(pct, `Đang xử lý (${i + 1}/${readyFiles.length}): ${fileEntry.name}...`);
             
             const outBytes = await generateReportBytes(fileEntry);
             
-            const blob = new Blob([outBytes], { type: 'application/pdf' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `${fileEntry.name.replace(/\.pdf$/i, '')}_CV_Report.pdf`;
-            document.body.appendChild(link); link.click(); document.body.removeChild(link);
-            
-            await new Promise(r => setTimeout(r, 600));
+            const fileName = `${fileEntry.name.replace(/\.pdf$/i, '')}_CV_Report.pdf`;
+            zip.file(fileName, outBytes);
         }
 
-        updateProgress(100, 'Hoàn thành!');
+        updateProgress(90, 'Đang đóng gói file ZIP...');
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        
+        updateProgress(98, 'Đang tải xuống...');
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(zipBlob);
+        link.download = `CV_Reports_${Date.now()}.zip`;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+
         setTimeout(() => {
             loadingOverlay.classList.remove('active');
             loaderTitle.textContent = 'Đang xử lý tài liệu...';
-            showToast(`Đã xuất thành công ${readyFiles.length} file CV PDF!`, 'success');
+            showToast(`Đã đóng gói và tải xuống thành công ${readyFiles.length} file CV!`, 'success');
         }, 800);
 
     } catch (err) {
         console.error(err);
         loadingOverlay.classList.remove('active');
         loaderTitle.textContent = 'Đang xử lý tài liệu...';
-        showToast(err.message || 'Có lỗi xảy ra khi xuất hàng loạt!', 'error');
+        showToast(err.message || 'Có lỗi xảy ra khi đóng gói hàng loạt!', 'error');
     }
 });
 
