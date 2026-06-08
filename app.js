@@ -109,6 +109,38 @@ function readFileAsArrayBuffer(file) {
     });
 }
 
+function translateAnnotations(page, dX, dY) {
+    const annots = page.node.Annots();
+    if (!annots) return;
+    const { PDFName, PDFNumber, PDFArray } = PDFLib;
+    
+    for (let idx = 0, len = annots.size(); idx < len; idx++) {
+        const ref = annots.get(idx);
+        const annot = page.node.context.lookup(ref);
+        if (annot) {
+            const rect = annot.get(PDFName.of('Rect'));
+            if (rect instanceof PDFArray) {
+                const x1 = rect.get(0);
+                const y1 = rect.get(1);
+                const x2 = rect.get(2);
+                const y2 = rect.get(3);
+                
+                if (
+                    x1 instanceof PDFNumber &&
+                    y1 instanceof PDFNumber &&
+                    x2 instanceof PDFNumber &&
+                    y2 instanceof PDFNumber
+                ) {
+                    rect.set(0, PDFNumber.of(x1.value() + dX));
+                    rect.set(1, PDFNumber.of(y1.value() + dY));
+                    rect.set(2, PDFNumber.of(x2.value() + dX));
+                    rect.set(3, PDFNumber.of(y2.value() + dY));
+                }
+            }
+        }
+    }
+}
+
 function updateProgress(pct, subtitle) {
     progressBar.style.width = `${pct}%`;
     if (subtitle) loaderSubtitle.textContent = subtitle;
@@ -254,17 +286,9 @@ processBtn.addEventListener('click', async () => {
         const pdfDoc = await PDFDocument.load(pdfBytes);
         const pages = pdfDoc.getPages();
         const totalPages = pages.length;
-        let destDoc, pngImage, embeddedPages = [];
-
-        if (state.shrinkContent) {
-            destDoc = await PDFDocument.create();
-            try { pngImage = await destDoc.embedPng(pngBytes); } catch { throw new Error('Invalid PNG.'); }
-            updateProgress(60, 'Embedding pages...');
-            embeddedPages = await destDoc.embedPdf(pdfDoc, Array.from({ length: totalPages }, (_, i) => i));
-        } else {
-            destDoc = pdfDoc;
-            try { pngImage = await destDoc.embedPng(pngBytes); } catch { throw new Error('Invalid PNG.'); }
-        }
+        let destDoc, pngImage;
+        destDoc = pdfDoc;
+        try { pngImage = await destDoc.embedPng(pngBytes); } catch { throw new Error('Invalid PNG.'); }
 
         const { width: imgW, height: imgH } = pngImage.scale(1.0);
         updateProgress(65, 'Inserting headers...');
@@ -275,31 +299,42 @@ processBtn.addEventListener('click', async () => {
             const [cropX, cropY, cropW, cropH] = [cb.x, cb.y, cb.width, cb.height];
             const skipped = (state.skipFirst && i === 0) || (state.skipLast && i === totalPages - 1);
 
+            if (skipped) continue;
+
+            const tw = cropW * (state.scale / 100);
+            const th = (imgH / imgW) * tw;
+
+            let hx = cropX;
+            if (state.alignment === 'center') hx = cropX + (cropW - tw) / 2;
+            else if (state.alignment === 'right') hx = cropX + cropW - tw;
+
+            const y_abs = cropY + cropH - state.topMargin - th;
+
             if (state.shrinkContent) {
-                const newPage = destDoc.addPage([origPage.getWidth(), origPage.getHeight()]);
-                newPage.setCropBox(cropX, cropY, cropW, cropH);
-                if (skipped) {
-                    newPage.drawPage(embeddedPages[i], { x: 0, y: 0, width: origPage.getWidth(), height: origPage.getHeight() });
-                } else {
-                    const tw = cropW * (state.scale / 100);
-                    const th = (imgH / imgW) * tw;
-                    const sf = Math.max(0.1, (cropH - state.topMargin - th - 15) / cropH);
-                    const dW = origPage.getWidth() * sf, dH = origPage.getHeight() * sf;
-                    const dX = cropX + (cropW - cropW * sf) / 2 - cropX * sf;
-                    const dY = cropY - cropY * sf;
-                    newPage.drawPage(embeddedPages[i], { x: dX, y: dY, width: dW, height: dH });
-                    let hx = cropX;
-                    if (state.alignment === 'center') hx = cropX + (cropW - tw) / 2;
-                    else if (state.alignment === 'right') hx = cropX + cropW - tw;
-                    newPage.drawImage(pngImage, { x: hx, y: cropY + cropH - state.topMargin - th, width: tw, height: th });
-                }
+                const sf = Math.max(0.1, (cropH - state.topMargin - th - 15) / cropH);
+                const dX = cropX + (cropW - cropW * sf) / 2 - cropX * sf;
+                const dY = cropY - cropY * sf;
+                
+                // Scale and translate the existing page content and annotations in-place
+                origPage.scaleContent(sf, sf);
+                origPage.scaleAnnotations(sf, sf);
+                origPage.translateContent(dX, dY);
+                translateAnnotations(origPage, dX, dY);
+                
+                // Draw the header image, adjusted for the local coordinate transformation
+                origPage.drawImage(pngImage, {
+                    x: (hx - dX) / sf,
+                    y: (y_abs - dY) / sf,
+                    width: tw / sf,
+                    height: th / sf
+                });
             } else {
-                if (skipped) continue;
-                const tw = cropW * (state.scale / 100), th = (imgH / imgW) * tw;
-                let x = cropX;
-                if (state.alignment === 'center') x = cropX + (cropW - tw) / 2;
-                else if (state.alignment === 'right') x = cropX + cropW - tw;
-                origPage.drawImage(pngImage, { x, y: cropY + cropH - state.topMargin - th, width: tw, height: th });
+                origPage.drawImage(pngImage, {
+                    x: hx,
+                    y: y_abs,
+                    width: tw,
+                    height: th
+                });
             }
             updateProgress(65 + Math.floor((i + 1) / totalPages * 25), `Page ${i + 1}/${totalPages}...`);
         }
@@ -770,25 +805,35 @@ async function generateReportBytes(fileEntry, pngBytes) {
     const origDoc   = await PDFDocument.load(pdfBytes);
     const origPages = origDoc.getPages();
     const total     = origPages.length;
-    const embedded  = await outDoc.embedPdf(origDoc, Array.from({ length: total }, (_, i) => i));
+    
+    // Copy pages to preserve links and annotations
+    const copiedPages = await outDoc.copyPages(origDoc, Array.from({ length: total }, (_, i) => i));
 
     for (let i = 0; i < total; i++) {
-        const op  = origPages[i];
+        const op  = copiedPages[i];
         const cb  = op.getCropBox();
         const [cX, cY, cW, cH] = [cb.x, cb.y, cb.width, cb.height];
 
-        const newPage = outDoc.addPage([op.getWidth(), op.getHeight()]);
-        newPage.setCropBox(cX, cY, cW, cH);
-
         const phH    = (pngDims.height / pngDims.width) * cW;
         const sf     = Math.max(0.5, (cH - phH - 12) / cH);
-        const dW     = op.getWidth()  * sf;
-        const dH     = op.getHeight() * sf;
         const dX     = cX + (cW - cW * sf) / 2 - cX * sf;
         const dY     = cY - cY * sf;
 
-        newPage.drawPage(embedded[i], { x: dX, y: dY, width: dW, height: dH });
-        newPage.drawImage(pngImage, { x: cX, y: cY + cH - phH, width: cW, height: phH });
+        // Perform scaling and translation in place on the copied page
+        op.scaleContent(sf, sf);
+        op.scaleAnnotations(sf, sf);
+        op.translateContent(dX, dY);
+        translateAnnotations(op, dX, dY);
+
+        // Draw header image adjusted for transformed coordinates
+        op.drawImage(pngImage, {
+            x: (cX - dX) / sf,
+            y: ((cY + cH - phH) - dY) / sf,
+            width: cW / sf,
+            height: phH / sf
+        });
+
+        outDoc.addPage(op);
     }
 
     const outBytes = await outDoc.save();
