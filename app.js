@@ -109,7 +109,7 @@ function readFileAsArrayBuffer(file) {
     });
 }
 
-function translateAnnotations(page, dX, dY) {
+function scaleAndTranslateAnnotations(page, scaleX, scaleY, dX, dY) {
     const annots = page.node.Annots();
     if (!annots) return;
     const { PDFName, PDFNumber, PDFArray } = PDFLib;
@@ -118,6 +118,7 @@ function translateAnnotations(page, dX, dY) {
         const ref = annots.get(idx);
         const annot = page.node.context.lookup(ref);
         if (annot) {
+            // 1. Scale and Translate Rect [x1, y1, x2, y2]
             const rect = annot.get(PDFName.of('Rect'));
             if (rect instanceof PDFArray) {
                 const x1 = rect.get(0);
@@ -131,10 +132,24 @@ function translateAnnotations(page, dX, dY) {
                     x2 instanceof PDFNumber &&
                     y2 instanceof PDFNumber
                 ) {
-                    rect.set(0, PDFNumber.of(x1.value() + dX));
-                    rect.set(1, PDFNumber.of(y1.value() + dY));
-                    rect.set(2, PDFNumber.of(x2.value() + dX));
-                    rect.set(3, PDFNumber.of(y2.value() + dY));
+                    rect.set(0, PDFNumber.of(x1.value() * scaleX + dX));
+                    rect.set(1, PDFNumber.of(y1.value() * scaleY + dY));
+                    rect.set(2, PDFNumber.of(x2.value() * scaleX + dX));
+                    rect.set(3, PDFNumber.of(y2.value() * scaleY + dY));
+                }
+            }
+            
+            // 2. Scale and Translate QuadPoints [x1, y1, x2, y2, x3, y3, x4, y4]
+            const quadPoints = annot.get(PDFName.of('QuadPoints'));
+            if (quadPoints instanceof PDFArray) {
+                for (let q = 0; q < quadPoints.size(); q++) {
+                    const val = quadPoints.get(q);
+                    if (val instanceof PDFNumber) {
+                        const isX = (q % 2 === 0);
+                        const factor = isX ? scaleX : scaleY;
+                        const offset = isX ? dX : dY;
+                        quadPoints.set(q, PDFNumber.of(val.value() * factor + offset));
+                    }
                 }
             }
         }
@@ -317,9 +332,8 @@ processBtn.addEventListener('click', async () => {
                 
                 // Scale and translate the existing page content and annotations in-place
                 origPage.scaleContent(sf, sf);
-                origPage.scaleAnnotations(sf, sf);
                 origPage.translateContent(dX, dY);
-                translateAnnotations(origPage, dX, dY);
+                scaleAndTranslateAnnotations(origPage, sf, sf, dX, dY);
                 
                 // Draw the header image, adjusted for the local coordinate transformation
                 origPage.drawImage(pngImage, {
@@ -821,9 +835,8 @@ async function generateReportBytes(fileEntry, pngBytes) {
 
         // Perform scaling and translation in place on the copied page
         op.scaleContent(sf, sf);
-        op.scaleAnnotations(sf, sf);
         op.translateContent(dX, dY);
-        translateAnnotations(op, dX, dY);
+        scaleAndTranslateAnnotations(op, sf, sf, dX, dY);
 
         // Draw header image adjusted for transformed coordinates
         op.drawImage(pngImage, {
