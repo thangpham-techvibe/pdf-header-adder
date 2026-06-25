@@ -392,7 +392,7 @@ function handleCvPdfsSelected(files) {
             id: fileId,
             file: file,
             name: file.name,
-            status: 'draft',
+            status: 'ready',
             form: {
                 name: '',
                 position: '',
@@ -479,10 +479,9 @@ const prevFields = {
 };
 
 function recalculateStatus(fileEntry) {
-    if (!fileEntry || !fileEntry.form) return 'draft';
-    const allFilled = Object.values(fileEntry.form).every(val => val && val.trim() !== '');
-    fileEntry.status = allFilled ? 'ready' : 'draft';
-    return fileEntry.status;
+    if (!fileEntry) return 'ready';
+    fileEntry.status = 'ready';
+    return 'ready';
 }
 
 function renderFileList() {
@@ -644,7 +643,7 @@ function checkCvReadyState() {
     const activeFile = cvState.files.find(f => f.id === cvState.activeFileId);
     const hasPng = !!cvState.pngFile;
     
-    if (activeFile && hasPng && activeFile.status === 'ready') {
+    if (activeFile && hasPng) {
         cvGenerateBtn.removeAttribute('disabled');
         cvStatusMessage.textContent = `CV "${activeFile.name}" đã sẵn sàng để xuất!`;
         cvStatusMessage.style.color = 'var(--success-color)';
@@ -653,17 +652,14 @@ function checkCvReadyState() {
         if (!hasPng) {
             cvStatusMessage.textContent = 'Vui lòng tải lên ảnh Header PNG.';
             cvStatusMessage.style.color = 'var(--text-secondary)';
-        } else if (!activeFile) {
-            cvStatusMessage.textContent = 'Vui lòng tải lên ít nhất một file CV PDF.';
-            cvStatusMessage.style.color = 'var(--text-secondary)';
         } else {
-            cvStatusMessage.textContent = 'Vui lòng điền đầy đủ cả 6 trường thông tin ứng viên để xuất PDF.';
+            cvStatusMessage.textContent = 'Vui lòng tải lên ít nhất một file CV PDF.';
             cvStatusMessage.style.color = 'var(--text-secondary)';
         }
     }
     
-    const anyReady = cvState.files.some(f => f.status === 'ready');
-    if (anyReady && hasPng) {
+    const hasFiles = cvState.files.length > 0;
+    if (hasFiles && hasPng) {
         cvExportAllBtn.removeAttribute('disabled');
     } else {
         cvExportAllBtn.setAttribute('disabled', 'true');
